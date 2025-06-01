@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+ColumnLimit: 100
+IncludeBlocks: Merge
+SortIncludes: CaseInsensitive
+
+AccessModifierOffset: -2
+
+AllowShortIfStatementsOnASingleLine: true
