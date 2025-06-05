@@ -1,5 +1,6 @@
 #include <nlohmann/json.h>
 #include <cmath>
+#include <cstddef>
 #include <fstream>
 #include <iostream>
 #include "constants.h"
@@ -40,30 +41,35 @@ void DrawButton(Button& button, Font font) {
   DrawRectangleRec(button.rect, buttonColor);
   DrawRectangleLinesEx(button.rect, 2, GRAY);
 
-  Vector2 textSize = MeasureTextEx(font, button.text, 20, 1);
+  Vector2 textSize = MeasureTextEx(font, button.text, 18, 1);
   Vector2 textPos = {button.rect.x + (button.rect.width - textSize.x) / 2,
                      button.rect.y + (button.rect.height - textSize.y) / 2};
 
-  DrawTextEx(font, button.text, textPos, 20, 1, textColor);
+  DrawTextEx(font, button.text, textPos, 18, 1, textColor);
 }
 
 // 绘制锚点
 void DrawAnchorPoint(AnchorPoint& anchor) {
   Color color = anchor.isHover ? RED : BLUE;
-  if (anchor.isDragging) color = MAROON;  // 使用 MAROON 替代 DARKRED
+  if (anchor.isDragging) color = MAROON;
 
   DrawCircleV(anchor.position, 8, color);
   DrawCircleV(anchor.position, 6, WHITE);
-  DrawCircleLinesV(anchor.position, 8, BLACK);  // 使用 DrawCircleLinesV
+  DrawCircleLinesV(anchor.position, 8, BLACK);
 }
 
 int main() {
   SetTraceLogLevel(LOG_WARNING);
+  SetConfigFlags(FLAG_MSAA_4X_HINT);  // 启用 4x 多重采样抗锯齿
   SetConfigFlags(FLAG_WINDOW_HIGHDPI);
-  InitWindow(kCardWidth + 400, kCardHeight + 200, "Card Editor");
+  InitWindow(kCardWidth + 450, kCardHeight + 200, "Card Editor");
   SetTargetFPS(60);
 
   using json = nlohmann::json;
+
+  // 加载 Noto Serif 字体
+  Font notoRegular = LoadFontEx("assets/fonts/noto-regular.ttf", 64, NULL, 0);
+  Font notoItalic = LoadFontEx("assets/fonts/noto-italic.ttf", 64, NULL, 0);
 
   // 加载纹理
   Texture2D texture = LoadTexture("assets/images/1.jpg");
@@ -74,14 +80,22 @@ int main() {
     UnloadImage(img);
   }
 
-  Font font = GetFontDefault();
-
   // 初始化变量
   float zoom = 1.0f;
   Vector2 offset = {0, 0};
   bool isDragging = false;
   Vector2 dragStart = {0, 0};
   Vector2 offsetStart = {0, 0};
+
+  // 锚点拖拽相关
+  int draggingAnchor = -1;  // -1表示没有拖拽锚点
+  float initialZoom = 1.0f;
+  Vector2 initialMousePos = {0, 0};
+  Vector2 scaleCenter = {0, 0};  // 缩放中心点
+
+  // 翻转状态
+  bool flipHorizontal = false;
+  bool flipVertical = false;
 
   // 卡片显示区域
   Rectangle cardRect = {50, 100, (float)kCardWidth, (float)kCardHeight};
@@ -90,15 +104,37 @@ int main() {
   Rectangle extendedRect = {cardRect.x - 150, cardRect.y - 150, cardRect.width + 300,
                             cardRect.height + 300};
 
-  // 创建按钮
-  Button zoomInBtn = {{cardRect.x + cardRect.width + 20, 120}, "Zoom (+)", false};
-  Button zoomOutBtn = {{cardRect.x + cardRect.width + 20, 160}, "Zoom (-)", false};
-  Button saveBtn = {{cardRect.x + cardRect.width + 20, 220}, "Save", false};
-  Button resetBtn = {{cardRect.x + cardRect.width + 20, 260}, "Reset", false};
+  // 创建按钮 - 重新排列
+  float btnX = cardRect.x + cardRect.width + 20;
+  float btnY = 120;
+  float btnW = 100;
+  float btnH = 30;
+  float btnSpacing = 35;
+
+  // 居中按钮
+  Button centerHBtn = {{btnX, btnY + btnSpacing * 0}, "Center H", false};
+  Button centerVBtn = {{btnX, btnY + btnSpacing * 1}, "Center V", false};
+
+  // 缩放按钮
+  Button zoomInBtn = {{btnX, btnY + btnSpacing * 2}, "Zoom (+)", false};
+  Button zoomOutBtn = {{btnX, btnY + btnSpacing * 3}, "Zoom (-)", false};
+
+  // 翻转按钮
+  Button flipHBtn = {{btnX, btnY + btnSpacing * 4}, "Flip H", false};
+  Button flipVBtn = {{btnX, btnY + btnSpacing * 5}, "Flip V", false};
+
+  // 保存重置按钮
+  Button saveBtn = {{btnX, btnY + btnSpacing * 6}, "Save", false};
+  Button resetBtn = {{btnX, btnY + btnSpacing * 7}, "Reset", false};
 
   // 设置按钮大小
-  zoomInBtn.rect.width = zoomOutBtn.rect.width = saveBtn.rect.width = resetBtn.rect.width = 100;
-  zoomInBtn.rect.height = zoomOutBtn.rect.height = saveBtn.rect.height = resetBtn.rect.height = 35;
+  Button* buttons[] = {&zoomInBtn, &zoomOutBtn, &saveBtn,    &resetBtn,
+                       &flipHBtn,  &flipVBtn,   &centerHBtn, &centerVBtn};
+
+  for (int i = 0; i < 8; i++) {
+    buttons[i]->rect.width = btnW;
+    buttons[i]->rect.height = btnH;
+  }
 
   // 锚点
   AnchorPoint anchors[4];
@@ -114,6 +150,8 @@ int main() {
       if (card.contains("s")) zoom = card["s"];
       if (card.contains("x")) offset.x = card["x"];
       if (card.contains("y")) offset.y = card["y"];
+      if (card.contains("flipH")) flipHorizontal = card["flipH"];
+      if (card.contains("flipV")) flipVertical = card["flipV"];
     }
   }
 
@@ -124,10 +162,9 @@ int main() {
     bool mouseReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
 
     // 处理按钮交互
-    zoomInBtn.isPressed = IsPointInRect(mousePos, zoomInBtn.rect) && mouseDown;
-    zoomOutBtn.isPressed = IsPointInRect(mousePos, zoomOutBtn.rect) && mouseDown;
-    saveBtn.isPressed = IsPointInRect(mousePos, saveBtn.rect) && mouseDown;
-    resetBtn.isPressed = IsPointInRect(mousePos, resetBtn.rect) && mouseDown;
+    for (int i = 0; i < 8; i++) {
+      buttons[i]->isPressed = IsPointInRect(mousePos, buttons[i]->rect) && mouseDown;
+    }
 
     if (mousePressed) {
       if (IsPointInRect(mousePos, zoomInBtn.rect)) {
@@ -140,7 +177,11 @@ int main() {
         // 保存配置
         json saveConfig;
         saveConfig["cards"] = json::array();
-        saveConfig["cards"][0] = {{"s", zoom}, {"x", offset.x}, {"y", offset.y}};
+        saveConfig["cards"][0] = {{"s", zoom},
+                                  {"x", offset.x},
+                                  {"y", offset.y},
+                                  {"flipH", flipHorizontal},
+                                  {"flipV", flipVertical}};
 
         std::ofstream output("data/cards.json");
         if (output.is_open()) {
@@ -151,6 +192,22 @@ int main() {
       } else if (IsPointInRect(mousePos, resetBtn.rect)) {
         zoom = 1.0f;
         offset = {0, 0};
+        flipHorizontal = false;
+        flipVertical = false;
+      } else if (IsPointInRect(mousePos, flipHBtn.rect)) {
+        flipHorizontal = !flipHorizontal;
+      } else if (IsPointInRect(mousePos, flipVBtn.rect)) {
+        flipVertical = !flipVertical;
+      } else if (IsPointInRect(mousePos, centerHBtn.rect)) {
+        // 水平居中：调整缩放使图片宽度与卡片宽度对齐，然后居中
+        float targetZoom = (float)kCardWidth / texture.width;
+        zoom = targetZoom;
+        offset.x = 0;  // 水平居中
+      } else if (IsPointInRect(mousePos, centerVBtn.rect)) {
+        // 垂直居中：调整缩放使图片高度与卡片高度对齐，然后居中
+        float targetZoom = (float)kCardHeight / texture.height;
+        zoom = targetZoom;
+        offset.y = 0;  // 垂直居中
       }
     }
 
@@ -168,46 +225,85 @@ int main() {
     anchors[2].position = {imgScreenX + imgDisplayWidth, imgScreenY + imgDisplayHeight};  // 右下
     anchors[3].position = {imgScreenX, imgScreenY + imgDisplayHeight};                    // 左下
 
-    // 检查锚点悬停
+    // 检查锚点悬停和拖拽
     for (int i = 0; i < 4; i++) {
       float dist = CalculateDistance(mousePos, anchors[i].position);
       anchors[i].isHover = dist <= 12;
+
+      if (draggingAnchor == -1 && mousePressed && anchors[i].isHover) {
+        // 开始拖拽锚点
+        draggingAnchor = i;
+        anchors[i].isDragging = true;
+        initialZoom = zoom;
+        initialMousePos = mousePos;
+
+        // 计算缩放中心点（对角锚点）
+        int oppositeCorner = (i + 2) % 4;
+        scaleCenter = anchors[oppositeCorner].position;
+      }
     }
 
-    // 处理图片拖拽
-    if (!isDragging) {
-      // 检查是否开始拖拽（在扩展区域内且不在按钮或锚点上）
-      if (mousePressed && IsPointInRect(mousePos, extendedRect)) {
-        bool onAnchor = false;
-        bool onButton = false;
+    // 处理锚点拖拽缩放
+    if (draggingAnchor != -1) {
+      if (mouseDown) {
+        // 计算从缩放中心到当前鼠标位置的距离
+        float currentDist = CalculateDistance(mousePos, scaleCenter);
+        float initialDist = CalculateDistance(initialMousePos, scaleCenter);
 
-        // 检查是否在锚点上
-        for (int i = 0; i < 4; i++) {
-          if (anchors[i].isHover) {
-            onAnchor = true;
-            break;
+        if (initialDist > 0) {
+          // 按比例缩放
+          float scaleRatio = currentDist / initialDist;
+          zoom = initialZoom * scaleRatio;
+
+          // 限制缩放范围
+          if (zoom < 0.1f) zoom = 0.1f;
+          if (zoom > 5.0f) zoom = 5.0f;
+        }
+      } else {
+        // 停止拖拽
+        anchors[draggingAnchor].isDragging = false;
+        draggingAnchor = -1;
+      }
+    }
+
+    // 处理图片拖拽（只有在没有拖拽锚点时才能拖拽图片）
+    if (draggingAnchor == -1) {
+      if (!isDragging) {
+        // 检查是否开始拖拽（在扩展区域内且不在按钮或锚点上）
+        if (mousePressed && IsPointInRect(mousePos, extendedRect)) {
+          bool onAnchor = false;
+          bool onButton = false;
+
+          // 检查是否在锚点上
+          for (int i = 0; i < 4; i++) {
+            if (anchors[i].isHover) {
+              onAnchor = true;
+              break;
+            }
+          }
+
+          // 检查是否在按钮上
+          for (int i = 0; i < 8; i++) {
+            if (IsPointInRect(mousePos, buttons[i]->rect)) {
+              onButton = true;
+              break;
+            }
+          }
+
+          if (!onAnchor && !onButton) {
+            isDragging = true;
+            dragStart = mousePos;
+            offsetStart = offset;
           }
         }
-
-        // 检查是否在按钮上
-        if (IsPointInRect(mousePos, zoomInBtn.rect) || IsPointInRect(mousePos, zoomOutBtn.rect) ||
-            IsPointInRect(mousePos, saveBtn.rect) || IsPointInRect(mousePos, resetBtn.rect)) {
-          onButton = true;
-        }
-
-        if (!onAnchor && !onButton) {
-          isDragging = true;
-          dragStart = mousePos;
-          offsetStart = offset;
-        }
-      }
-    } else {
-      if (mouseDown) {
-        Vector2 delta = {mousePos.x - dragStart.x, mousePos.y - dragStart.y};
-        offset.x = offsetStart.x - delta.x / zoom;
-        offset.y = offsetStart.y - delta.y / zoom;
       } else {
-        isDragging = false;
+        if (mouseDown) {
+          Vector2 delta = {mousePos.x - dragStart.x, mousePos.y - dragStart.y};
+          offset.x = offsetStart.x - delta.x / zoom;
+          offset.y = offsetStart.y - delta.y / zoom;
+        } else {
+          isDragging = false;
+        }
       }
     }
 
@@ -223,12 +319,24 @@ int main() {
     if (IsKeyPressed(KEY_R)) {
       zoom = 1.0f;
       offset = {0, 0};
+      flipHorizontal = false;
+      flipVertical = false;
+    }
+    if (IsKeyPressed(KEY_H)) {
+      flipHorizontal = !flipHorizontal;
+    }
+    if (IsKeyPressed(KEY_V)) {
+      flipVertical = !flipVertical;
     }
     if (IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))) {
       // 保存
       json saveConfig;
       saveConfig["cards"] = json::array();
-      saveConfig["cards"][0] = {{"s", zoom}, {"x", offset.x}, {"y", offset.y}};
+      saveConfig["cards"][0] = {{"s", zoom},
+                                {"x", offset.x},
+                                {"y", offset.y},
+                                {"flipH", flipHorizontal},
+                                {"flipV", flipVertical}};
 
       std::ofstream output("data/cards.json");
       if (output.is_open()) {
@@ -241,13 +349,11 @@ int main() {
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
-    // 计算图片的源矩形（不重复，只显示图片的一部分）
-    Rectangle sourceRec = {
-        0,  // 始终从图片的 (0,0) 开始
-        0,
-        (float)texture.width,  // 使用完整的图片宽度
-        (float)texture.height  // 使用完整的图片高度
-    };
+    // 计算图片的源矩形（处理翻转）
+    Rectangle sourceRec = {flipHorizontal ? (float)texture.width : 0,
+                           flipVertical ? (float)texture.height : 0,
+                           flipHorizontal ? -(float)texture.width : (float)texture.width,
+                           flipVertical ? -(float)texture.height : (float)texture.height};
 
     // 计算图片在屏幕上的目标矩形
     Rectangle destRec = {imgScreenX, imgScreenY, imgDisplayWidth, imgDisplayHeight};
@@ -273,26 +379,35 @@ int main() {
     }
 
     // 绘制按钮
-    DrawButton(zoomInBtn, font);
-    DrawButton(zoomOutBtn, font);
-    DrawButton(saveBtn, font);
-    DrawButton(resetBtn, font);
+    for (int i = 0; i < 8; i++) {
+      DrawButton(*buttons[i], notoRegular);
+    }
 
+    // clang-format off
     // 绘制信息文本
-    DrawText("Card Editor", 10, 10, 24, DARKGRAY);
-    DrawText(TextFormat("Scale: %.2f", zoom), 10, 40, 20, DARKGRAY);
-    DrawText(TextFormat("Offset: (%.0f, %.0f)", offset.x, offset.y), 10, 65, 20, DARKGRAY);
+    DrawTextEx(notoRegular, "Card Editor", (Vector2){10, 10}, 24, 1, DARKGRAY);
+    DrawTextEx(notoRegular, TextFormat("Scale: %.2f", zoom), (Vector2){10, 40}, 16, 1, DARKGRAY);
+    DrawTextEx(notoRegular, TextFormat("Offset: (%.0f, %.0f)", offset.x, offset.y), (Vector2){10, 60}, 16, 1, DARKGRAY);
+    DrawTextEx(notoRegular,
+        TextFormat("Flip h: %s, v: %s", flipHorizontal ? "on" : "off", flipVertical ? "on" : "off"),
+        (Vector2){10, 80}, 16, 1, DARKGRAY);
 
-    // 绘制操作提示
-    DrawText("Controls:", cardRect.x + cardRect.width + 20, 320, 18, DARKGRAY);
-    DrawText("• Drag to move image", cardRect.x + cardRect.width + 20, 345, 14, GRAY);
-    DrawText("• +/- keys to scale", cardRect.x + cardRect.width + 20, 365, 14, GRAY);
-    DrawText("• R key to reset", cardRect.x + cardRect.width + 20, 385, 14, GRAY);
-    DrawText("• Ctrl+S to save", cardRect.x + cardRect.width + 20, 405, 14, GRAY);
+    // 使用 Noto Serif Italic 字体绘制操作提示
+    DrawTextEx(notoItalic, "Controls:", (Vector2){btnX, btnY + btnSpacing * 8 + 20}, 18, 1, DARKGRAY);
+    DrawTextEx(notoItalic, " Drag image to move", (Vector2){btnX, btnY + btnSpacing * 8 + 45}, 14, 1, GRAY);
+    DrawTextEx(notoItalic, " Drag anchors to scale", (Vector2){btnX, btnY + btnSpacing * 8 + 65}, 14, 1, GRAY);
+    DrawTextEx(notoItalic, " +/- keys to scale", (Vector2){btnX, btnY + btnSpacing * 8 + 85}, 14, 1, GRAY);
+    DrawTextEx(notoItalic, " H/V keys to flip", (Vector2){btnX, btnY + btnSpacing * 8 + 105}, 14, 1, GRAY);
+    DrawTextEx(notoItalic, " R key to reset", (Vector2){btnX, btnY + btnSpacing * 8 + 125}, 14, 1, GRAY);
+    DrawTextEx(notoItalic, " Ctrl+S to save", (Vector2){btnX, btnY + btnSpacing * 8 + 145}, 14, 1, GRAY);
 
     if (isDragging) {
-      DrawText("Dragging...", cardRect.x, cardRect.y - 25, 16, RED);
+      DrawTextEx(notoRegular, "Moving image...", (Vector2){cardRect.x, cardRect.y - 25}, 16, 1, RED);
     }
+    if (draggingAnchor != -1) {
+      DrawTextEx(notoRegular, "Scaling...", (Vector2){cardRect.x, cardRect.y - 25}, 16, 1, BLUE);
+    }
+    // clang-format on
 
     EndDrawing();
   }
