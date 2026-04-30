@@ -3,3 +3,6 @@ build/
 /window.state
 /imgui.ini
 __pycache__/
+
+# game refs
+/ref-balatro/
