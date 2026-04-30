@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 
 #include <raylib.h>
 
@@ -10,14 +11,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-
-const ImGuiLayer::Theme ImGuiLayer::kThemes[5] = {
-    {"Default",    {0.051f, 0.063f, 0.106f, 1.0f}},
-    {"Classic",    {0.91f, 0.90f, 0.86f, 1.0f}},
-    {"Forest",     {0.18f, 0.26f, 0.14f, 1.0f}},
-    {"Lake",       {0.14f, 0.26f, 0.35f, 1.0f}},
-    {"Night Void", {0.15f, 0.16f, 0.22f, 1.0f}},
-};
+#include <nlohmann/json.hpp>
 
 ImGuiLayer::ImGuiLayer() : Layer("ImGuiLayer") {}
 
@@ -34,6 +28,7 @@ void ImGuiLayer::OnAttach() {
 
   LoadFonts(dpi_scale);
   SetupStyle(dpi_scale);
+  LoadThemes();
 
   GLFWwindow* window = glfwGetCurrentContext();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -141,10 +136,10 @@ void ImGuiLayer::DrawThemesPanel() {
     return;
   }
 
-  if (ImGui::BeginCombo("Theme", kThemes[selected_theme_].name)) {
-    for (int i = 0; i < (int)(sizeof(kThemes) / sizeof(kThemes[0])); ++i) {
+  if (ImGui::BeginCombo("Theme", themes_[selected_theme_].name.c_str())) {
+    for (int i = 0; i < static_cast<int>(themes_.size()); ++i) {
       const bool is_selected = selected_theme_ == i;
-      if (ImGui::Selectable(kThemes[i].name, is_selected)) {
+      if (ImGui::Selectable(themes_[i].name.c_str(), is_selected)) {
         ApplyTheme(i);
       }
       if (is_selected) {
@@ -167,8 +162,79 @@ void ImGuiLayer::DrawThemesPanel() {
 }
 
 void ImGuiLayer::ApplyTheme(int index) {
-  selected_theme_ = std::clamp(index, 0, (int)(sizeof(kThemes) / sizeof(kThemes[0])) - 1);
-  background_color_ = kThemes[selected_theme_].background;
+  selected_theme_ = std::clamp(index, 0, static_cast<int>(themes_.size()) - 1);
+  background_color_ = themes_[selected_theme_].background;
+}
+
+std::vector<ImGuiLayer::Theme> ImGuiLayer::DefaultThemes() {
+  return {
+      {"Default", {0.14f, 0.14f, 0.14f, 1.0f}},
+      {"Classic", {0.91f, 0.90f, 0.86f, 1.0f}},
+  };
+}
+
+void ImGuiLayer::LoadThemes() {
+  themes_ = DefaultThemes();
+  const std::filesystem::path config_path = std::filesystem::path{"assets/themes.json"};
+  if (!std::filesystem::exists(config_path)) {
+    return;
+  }
+
+  try {
+    std::ifstream in(config_path);
+    if (!in.is_open()) {
+      return;
+    }
+
+    nlohmann::json root;
+    in >> root;
+
+    const auto it = root.find("themes");
+    if (it == root.end() || !it->is_array()) {
+      return;
+    }
+
+    std::vector<Theme> loaded;
+    for (const auto& item : *it) {
+      if (!item.is_object()) {
+        continue;
+      }
+      const auto name_it = item.find("name");
+      const auto bg_it = item.find("background");
+      if (name_it == item.end() || bg_it == item.end() || !name_it->is_string() || !bg_it->is_array() ||
+          bg_it->size() != 4) {
+        continue;
+      }
+
+      bool valid = true;
+      ColorValue bg{};
+      for (int i = 0; i < 4; ++i) {
+        if (!(*bg_it)[i].is_number()) {
+          valid = false;
+          break;
+        }
+      }
+      if (!valid) {
+        continue;
+      }
+
+      bg.r = std::clamp((*bg_it)[0].get<float>(), 0.0f, 1.0f);
+      bg.g = std::clamp((*bg_it)[1].get<float>(), 0.0f, 1.0f);
+      bg.b = std::clamp((*bg_it)[2].get<float>(), 0.0f, 1.0f);
+      bg.a = std::clamp((*bg_it)[3].get<float>(), 0.0f, 1.0f);
+
+      loaded.push_back(Theme{name_it->get<std::string>(), bg});
+    }
+
+    if (!loaded.empty()) {
+      themes_ = std::move(loaded);
+    }
+  } catch (...) {
+    themes_ = DefaultThemes();
+  }
+
+  selected_theme_ = std::clamp(selected_theme_, 0, static_cast<int>(themes_.size()) - 1);
+  background_color_ = themes_[selected_theme_].background;
 }
 
 void ImGuiLayer::LoadFonts(float dpi_scale) {

@@ -2,6 +2,9 @@
 
 #include <raylib.h>
 
+#include <string>
+#include <vector>
+
 #include "layer.h"
 
 class ImGuiLayer : public Layer {
@@ -37,7 +40,7 @@ class ImGuiLayer : public Layer {
   };
 
   struct Theme {
-    const char* name;
+    std::string name;
     ColorValue background;
   };
 
@@ -46,14 +49,15 @@ class ImGuiLayer : public Layer {
   void DrawThemesPanel();
 
   void ApplyTheme(int index);
+  void LoadThemes();
   void LoadFonts(float dpi_scale);
   void SetupStyle(float dpi_scale);
 
   static Color ToRaylibColor(const ColorValue& color);
   static float GetDpiScale();
+  static std::vector<Theme> DefaultThemes();
 
   static constexpr float kImGuiBaseFontSize = 18.0f;
-  static const Theme kThemes[5];
 
   bool visible_ = true;
   bool show_inspector_ = true;
@@ -61,5 +65,6 @@ class ImGuiLayer : public Layer {
   bool show_demo_ = false;
 
   int selected_theme_ = 0;
+  std::vector<Theme> themes_;
   ColorValue background_color_{};
 };

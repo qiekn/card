@@ -1,0 +1,12 @@
+﻿{
+  "themes": [
+    {
+      "name": "Default",
+      "background": [0.14, 0.14, 0.14, 1.0]
+    },
+    {
+      "name": "Classic",
+      "background": [0.91, 0.90, 0.86, 1.0]
+    }
+  ]
+}
