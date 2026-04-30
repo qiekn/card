@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <memory>
 
+#include "game_layer.h"
+
 namespace {
 constexpr const char* kWindowStateFile = "window.state";
 
@@ -67,8 +69,15 @@ void Game::Init() {
   InitAudioDevice();
 
   auto imgui_layer = std::make_unique<ImGuiLayer>();
+  auto game_layer = std::make_unique<GameLayer>();
+
   imgui_layer_ = imgui_layer.get();
-  layers_.push_overlay(std::move(imgui_layer));
+
+  // Order matters: ImGuiLayer must submit DockSpaceOverViewport before
+  // GameLayer's Viewport window so the panel can dock into the central node
+  // on the first frame.
+  layers_.push_layer(std::move(imgui_layer));
+  layers_.push_layer(std::move(game_layer));
 }
 
 void Game::Tick() {
