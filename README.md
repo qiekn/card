@@ -164,3 +164,11 @@ override `OnUpdate` / `OnRender` / `OnImGuiRender`, and `push_layer` it during
   is the formatting source of truth — see `.clang-format`.
 - Run the binary from the **repo root**, not from `build/` — assets are
   resolved relative to CWD.
+
+## Notes & design docs
+
+Notes and design decisions live in [`docs/`](./docs/). Treat it as the second
+source of truth alongside the code: when you change or learn how a system
+works, update the relevant `docs/balatro/*.md` (Balatro source readings) or
+`docs/architecture/*.md` (our C++ port decisions). `docs/roadmap.md` tracks
+MVP progress.
