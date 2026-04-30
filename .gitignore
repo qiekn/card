@@ -6,3 +6,6 @@ __pycache__/
 
 # game refs
 /ref-balatro/
+
+# mdBook build output
+/docs/book/
