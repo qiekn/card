@@ -1,6 +1,5 @@
 ---
 source: ref-balatro/engine/{object,node,moveable}.lua
-last reviewed: 2026-05-01
 ---
 
 # 01 · Object / Node / Moveable
