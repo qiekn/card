@@ -1,0 +1,65 @@
+#pragma once
+
+#include <raylib.h>
+
+#include "layer.h"
+
+class ImGuiLayer : public Layer {
+ public:
+  ImGuiLayer();
+
+  void OnAttach() override;
+  void OnDetach() override;
+  void OnUpdate(float dt) override;
+  void OnImGuiRender() override;
+
+  // Begin/End bracket the per-frame ImGui pass around every layer's
+  // OnImGuiRender. Keeping this explicit (rather than rolling it into
+  // OnImGuiRender) lets the owner decide the exact ordering relative to
+  // raylib draws and multi-viewport rendering.
+  void Begin();
+  void End();
+
+  void ToggleVisible() { visible_ = !visible_; }
+  bool IsVisible() const { return visible_; }
+
+  Color BackgroundColor() const { return ToRaylibColor(background_color_); }
+
+ private:
+  struct ColorValue {
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+    float a = 1.0f;
+
+    float* data() { return &r; }
+    const float* data() const { return &r; }
+  };
+
+  struct Theme {
+    const char* name;
+    ColorValue background;
+  };
+
+  void DrawMainMenuBar();
+  void DrawInspectorPanel();
+  void DrawThemesPanel();
+
+  void ApplyTheme(int index);
+  void LoadFonts(float dpi_scale);
+  void SetupStyle(float dpi_scale);
+
+  static Color ToRaylibColor(const ColorValue& color);
+  static float GetDpiScale();
+
+  static constexpr float kImGuiBaseFontSize = 18.0f;
+  static const Theme kThemes[5];
+
+  bool visible_ = true;
+  bool show_inspector_ = true;
+  bool show_themes_ = true;
+  bool show_demo_ = false;
+
+  int selected_theme_ = 0;
+  ColorValue background_color_{};
+};
