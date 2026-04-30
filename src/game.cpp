@@ -73,6 +73,11 @@ void Game::Init() {
 
   imgui_layer_ = imgui_layer.get();
 
+  imgui_layer_->BindGamePanelToggles(game_layer->ShowViewportPtr(),
+                                     game_layer->ShowHierarchyPtr(),
+                                     game_layer->ShowConsolePtr(),
+                                     game_layer->ViewportNoTitleBarPtr());
+
   // Order matters: ImGuiLayer must submit DockSpaceOverViewport before
   // GameLayer's Viewport window so the panel can dock into the central node
   // on the first frame.

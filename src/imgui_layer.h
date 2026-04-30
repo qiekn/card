@@ -28,6 +28,10 @@ class ImGuiLayer : public Layer {
 
   Color BackgroundColor() const { return ToRaylibColor(background_color_); }
 
+  // Wires the View menu and Reset Layout to GameLayer-owned panel toggles. Pass
+  // null to opt out of any individual entry.
+  void BindGamePanelToggles(bool* viewport, bool* hierarchy, bool* console, bool* viewport_no_titlebar);
+
  private:
   struct ColorValue {
     float r = 0.0f;
@@ -70,6 +74,11 @@ class ImGuiLayer : public Layer {
   bool show_demo_ = false;
 
   bool needs_default_layout_ = false;
+
+  bool* show_viewport_ = nullptr;
+  bool* show_hierarchy_ = nullptr;
+  bool* show_console_ = nullptr;
+  bool* viewport_no_titlebar_ = nullptr;
 
   int selected_theme_ = 0;
   std::vector<Theme> themes_;
