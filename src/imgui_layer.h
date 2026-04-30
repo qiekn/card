@@ -48,6 +48,11 @@ class ImGuiLayer : public Layer {
   void DrawInspectorPanel();
   void DrawThemesPanel();
 
+  // Submits DockSpaceOverViewport and (on first run, when no imgui.ini exists)
+  // installs the default game-engine dock layout via the DockBuilder API.
+  void DrawDockSpace();
+  void SetupDefaultLayout(unsigned int dockspace_id);
+
   void ApplyTheme(int index);
   void LoadThemes();
   void LoadFonts(float dpi_scale);
@@ -63,6 +68,8 @@ class ImGuiLayer : public Layer {
   bool show_inspector_ = true;
   bool show_themes_ = true;
   bool show_demo_ = false;
+
+  bool needs_default_layout_ = false;
 
   int selected_theme_ = 0;
   std::vector<Theme> themes_;

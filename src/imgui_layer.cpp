@@ -11,6 +11,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
 #include <nlohmann/json.hpp>
 
 ImGuiLayer::ImGuiLayer() : Layer("ImGuiLayer") {}
@@ -35,6 +36,11 @@ void ImGuiLayer::OnAttach() {
   ImGui_ImplOpenGL3_Init("#version 330");
 
   ApplyTheme(selected_theme_);
+
+  // If the user has no saved imgui.ini we apply our default game-engine
+  // layout on the first frame. Subsequent runs reuse the user's saved layout.
+  const char* ini = io.IniFilename ? io.IniFilename : "imgui.ini";
+  needs_default_layout_ = !std::filesystem::exists(ini);
 }
 
 void ImGuiLayer::OnDetach() {
@@ -70,10 +76,7 @@ void ImGuiLayer::End() {
 void ImGuiLayer::OnImGuiRender() {
   // Visibility is gated by Game::Render before this runs, so no check here.
 
-  ImGui::DockSpaceOverViewport(
-      0, ImGui::GetMainViewport(),
-      ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoDockingOverCentralNode);
-
+  DrawDockSpace();
   DrawMainMenuBar();
 
   if (show_inspector_) DrawInspectorPanel();
@@ -82,6 +85,39 @@ void ImGuiLayer::OnImGuiRender() {
   if (show_demo_) {
     ImGui::ShowDemoWindow(&show_demo_);
   }
+}
+
+void ImGuiLayer::DrawDockSpace() {
+  // PassthruCentralNode lets the raylib clear color show through where no
+  // window is docked. We deliberately omit NoDockingOverCentralNode so the
+  // Viewport panel can occupy the central node.
+  const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(
+      0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
+  if (needs_default_layout_) {
+    needs_default_layout_ = false;
+    SetupDefaultLayout(dockspace_id);
+  }
+}
+
+void ImGuiLayer::SetupDefaultLayout(unsigned int dockspace_id) {
+  const ImGuiID id = static_cast<ImGuiID>(dockspace_id);
+  ImGui::DockBuilderRemoveNode(id);
+  ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_DockSpace);
+  ImGui::DockBuilderSetNodeSize(id, ImGui::GetMainViewport()->Size);
+
+  ImGuiID dock_main = id;
+  const ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.18f, nullptr, &dock_main);
+  const ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
+  const ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.28f, nullptr, &dock_main);
+
+  ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
+  ImGui::DockBuilderDockWindow("Inspector", dock_right);
+  ImGui::DockBuilderDockWindow("Themes", dock_right);
+  ImGui::DockBuilderDockWindow("Console", dock_bottom);
+  ImGui::DockBuilderDockWindow("Viewport", dock_main);
+
+  ImGui::DockBuilderFinish(id);
 }
 
 void ImGuiLayer::DrawMainMenuBar() {
@@ -97,6 +133,10 @@ void ImGuiLayer::DrawMainMenuBar() {
   if (ImGui::BeginMenu("View")) {
     ImGui::MenuItem("Inspector", nullptr, &show_inspector_);
     ImGui::MenuItem("Themes", nullptr, &show_themes_);
+    ImGui::Separator();
+    if (ImGui::MenuItem("Reset Layout")) {
+      needs_default_layout_ = true;
+    }
     ImGui::Separator();
     ImGuiIO& io = ImGui::GetIO();
     bool viewports = (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
