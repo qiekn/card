@@ -6,6 +6,7 @@
 
 - [Object / Node / Moveable](./balatro/01-object-node-moveable.md)
 - [CardArea / Card](./balatro/02-cardarea-card.md)
+- [Sprite / Shader](./balatro/03-sprite-shader.md)
 
 # 架构决策
 
