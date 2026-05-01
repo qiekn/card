@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "engine/text.h"
+
 GameLayer::GameLayer() : Layer("GameLayer") {}
 
 GameLayer::~GameLayer() = default;
@@ -62,7 +64,11 @@ void GameLayer::EnsureTarget(int w, int h) {
   if (target_valid_ && target_w_ == w && target_h_ == h) return;
   if (target_valid_) UnloadRenderTexture(target_);
   target_ = LoadRenderTexture(w, h);
-  SetTextureFilter(target_.texture, TEXTURE_FILTER_BILINEAR);
+  // POINT filter avoids the BILINEAR half-pixel smear that turns 1px grid
+  // lines into uneven 1/2px streaks when ImGui::Image scales the RT by a
+  // non-integer factor. Text stays crisp because engine::text bakes its
+  // atlas at 2× super-sample, so atlas-level AA survives the nearest tap.
+  SetTextureFilter(target_.texture, TEXTURE_FILTER_POINT);
   target_w_ = w;
   target_h_ = h;
   target_valid_ = true;
@@ -72,20 +78,14 @@ void GameLayer::DrawScene() {
   BeginTextureMode(target_);
   ClearBackground(background_color_);
 
-  // Reference grid so resizes are visible.
+  // Reference grid so resizes are visible. Translucent white reads cleanly
+  // against any theme background instead of fighting a fixed dark color.
+  const Color kGridColor{255, 255, 255, 32};
   for (int x = 0; x < target_w_; x += 32) {
-    DrawLine(x, 0, x, target_h_, Color{60, 60, 80, 255});
+    DrawLine(x, 0, x, target_h_, kGridColor);
   }
   for (int y = 0; y < target_h_; y += 32) {
-    DrawLine(0, y, target_w_, y, Color{60, 60, 80, 255});
-  }
-
-  // Three slot markers (faint) so you can see where 1/2/3 send the box.
-  const float vw = static_cast<float>(target_w_);
-  for (int slot = 1; slot <= 3; ++slot) {
-    const float fx = vw * 0.25f * static_cast<float>(slot);
-    DrawLine(static_cast<int>(fx), 0, static_cast<int>(fx), target_h_,
-             Color{80, 80, 110, 255});
+    DrawLine(0, y, target_w_, y, kGridColor);
   }
 
   // The Movable box: position+size from VT (eased), centered rotation.
@@ -97,13 +97,10 @@ void GameLayer::DrawScene() {
   const float deg = vt.r * 57.2957795f;  // raylib wants degrees
   DrawRectanglePro(rect, origin, deg, Color{220, 90, 90, 255});
 
-  DrawText(TextFormat("Slot %d  (1/2/3 to move, J to juice)", demo_slot_),
-           16, 16, 20, RAYWHITE);
-  DrawText(TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s",
-                      demo_.T().x, demo_.VT().x,
-                      demo_.HasJuice() ? "yes" : "no"),
-           16, 42, 16, Color{180, 180, 200, 255});
-  DrawFPS(16, target_h_ - 30);
+  engine::DrawTextBold(TextFormat("Slot %d  (1/2/3 to move, J to juice)", demo_slot_), Vector2{16, 16}, 18, RAYWHITE);
+  engine::DrawText(
+      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s", demo_.T().x, demo_.VT().x, demo_.HasJuice() ? "yes" : "no"),
+      Vector2{16, 44}, 18, Color{180, 180, 200, 255});
 
   EndTextureMode();
 }
