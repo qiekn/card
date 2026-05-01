@@ -11,20 +11,27 @@
 docs/
 ├── README.md                         # 这份索引
 ├── roadmap.md                        # MVP 实现进度 + 经验教训
-├── balatro/                          # ref-balatro 源码精读
+├── balatro/                          # ref-balatro 源码精读 (A 文档)
 │   ├── 01-object-node-moveable.md
 │   ├── 02-cardarea-card.md
 │   ├── 03-sprite-shader.md
 │   ├── 04-particles.md
 │   ├── 05-ui-system.md               # 仅作了解，不移植
 │   └── 06-draw-pipeline.md
-└── architecture/                     # 我们 C++ 实现的设计决策
-    ├── port-decisions.md             # 哪些原样移植 / 改写 / 丢
-    ├── ecs-vs-oo.md
-    ├── shader-uniforms.md
-    ├── hud-rendering.md
-    └── asset-pipeline.md
+├── architecture/                     # 移植决策 (A 文档)
+│   ├── port-decisions.md             # 哪些原样移植 / 改写 / 丢
+│   ├── ecs-vs-oo.md
+│   ├── shader-uniforms.md
+│   ├── hud-rendering.md
+│   └── asset-pipeline.md
+└── project/                          # 我们的 C++ 实现 (B 文档)
+    ├── README.md                     # B 文档导览 + 写作约定差异
+    ├── code-layout.md
+    └── build-system.md
 ```
+
+A 文档（balatro + architecture）= 写 lua 行为 + 移植决策，**不放 C++ 代码**。
+B 文档（project）= 写 C++ 实现 / 接口边界，从 Phase 2 起陆续添加。
 
 ## 写作约定
 
