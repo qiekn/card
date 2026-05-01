@@ -101,11 +101,11 @@ C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
 
 ## 6 · Atlas 元数据
 
-13 个 atlas 的 `(name, path, px, py)` 在 `game.lua:5660-5755`（03 笔记
+15 个 atlas 的 `(name, path, px, py)` 在 `game.lua:5660-5735`（03 笔记
 §2.2 列出）。这些数据**不来自资产文件本身**——Balatro 是把元数据硬编码在
 代码里。
 
-我们项目的 `assets/balatro/atlases.json`（或 `.toml`）需要**手抄**这 13 项：
+我们项目的 `assets/balatro/atlases.json`（或 `.toml`）需要**手抄**这 15 项：
 
 ```text
 [
@@ -122,11 +122,14 @@ C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
   { "name": "gamepad_ui","path":"gamepad_ui.png",   "px": 32,  "py": 32 },
   { "name": "icons",   "path": "icons.png",         "px": 66,  "py": 66 },
   { "name": "tags",    "path": "tags.png",          "px": 34,  "py": 34 },
+  { "name": "stickers","path": "stickers.png",      "px": 71,  "py": 95 },
   { "name": "chips",   "path": "chips.png",         "px": 29,  "py": 29 }
 ]
 ```
 
-外加 2 个 animation atlas（`blind_chips` 21 帧、`shop_sign` 4 帧）defer。
+外加 2 个 animation atlas（`blind_chips` 21 帧、`shop_sign` 4 帧，
+`game.lua:5644-5659`）defer。collabs/ 子目录里的 `collab_*` 一对对
+跟卡牌同尺寸（71×95），MVP 不接 IP 联动 —— 也 defer。
 
 **这份 JSON 入仓**——它是我们对 Balatro 资产的"接口定义"，不依赖资产本身。
 
