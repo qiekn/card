@@ -70,11 +70,31 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 
 ## Phase 4 — Sprite + 一张卡
 
-- [ ] `src/engine/sprite.h/.cpp` (atlas + quad slicing)
-- [ ] viewport 中央渲染一张卡，atlas quad 边界正确
+- [x] `src/engine/sprite.h/.cpp` (atlas + quad slicing)
+- [x] viewport 中央渲染一张卡，atlas quad 边界正确
 
 ### 经验教训
-_(待填)_
+
+- **Movable 是 move-only**（`Velocity` / `std::optional<Juice>` 不让拷），
+  Sprite 直接继承下来也是 move-only。GameLayer 想"延迟构造"——OnAttach 时
+  才 load 完 Atlas 才能造 Sprite——`std::optional<engine::Sprite>` + emplace
+  是最干净的写法。指针 / 引用都不行（前者要管寿命、后者不能 reseat）。
+- **Atlas 用 raylib `Texture2D.id == 0` 当 sentinel "empty"**：dtor 只在
+  `id != 0` 时 UnloadTexture，move ctor / op= 把源 id 清零。POD 配 RAII
+  没有真"析构异常"问题，写起来比 unique_ptr<Texture2D, Deleter> 短一截。
+- **lua `prep_draw + draw_self` 整条链压成一个 `DrawTexturePro`**：raylib
+  这个 API 自带 `origin` 参数，把"绕中心旋转"内化掉，省了手写
+  push/translate/rotate/translate/pop 的 OpenGL matrix 链。代价是不能多
+  pass（要加 shadow/shader 时得手回退到 `BeginMode2D` + 多次绘）。
+- **Atlas 写死 `TEXTURE_FILTER_POINT`**：Balatro 是 pixel art，1px 描边被
+  bilinear 糊成 2px 模糊带。所有 atlas 都该 POINT，没构造参数让 caller 选
+  ——以后真有非 POINT 需求再加。和 RT 端 POINT filter 是叠加效果：
+  atlas POINT → RT POINT → ImGui::Image 缩放（仍是 POINT）。
+- **资产缺失走 fprintf + Render noop，不 exit(1)**：跟
+  architecture/asset-pipeline.md §5 写的 `AssertAssetsPresent → exit(1)`
+  不一致。MVP 选 noop 因为没装 Balatro 还想能跑别的——但这是债，Phase 5
+  加 AtlasRegistry 时要统一决策（要么所有 atlas 失败都 exit，要么补
+  fallback texture）。
 
 ## Phase 5 — CardArea + 手牌弧形
 
