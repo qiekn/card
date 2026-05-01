@@ -10,6 +10,14 @@ void GameLayer::OnAttach() {
   // Allocate something non-zero so the first frame has a valid texture even
   // before the Viewport panel reports its real size.
   EnsureTarget(1280, 720);
+
+  // Movable demo: a 200x200 box that eases between three slots.
+  // T.x set instantly by 1/2/3 keys; VT.x exp-eases each frame.
+  const float w = 200.0f;
+  const float h = 200.0f;
+  const float center_x = static_cast<float>(target_w_) * 0.5f - w * 0.5f;
+  const float center_y = static_cast<float>(target_h_) * 0.5f - h * 0.5f;
+  demo_.HardSetT(center_x, center_y, w, h);
 }
 
 void GameLayer::OnDetach() {
@@ -19,7 +27,24 @@ void GameLayer::OnDetach() {
   }
 }
 
-void GameLayer::OnUpdate(float dt) { time_ += dt; }
+void GameLayer::OnUpdate(float dt) {
+  time_ += dt;
+
+  // Demo controls — 1/2/3 set T.x to 1/4, 1/2, 3/4 of viewport.
+  // VT.x exp-eases toward T.x via demo_.Move(dt) below.
+  const float w = demo_.T().w;
+  const float y = static_cast<float>(target_h_) * 0.5f - demo_.T().h * 0.5f;
+  const float vw = static_cast<float>(target_w_);
+  if (IsKeyPressed(KEY_ONE))   { demo_.T().x = vw * 0.25f - w * 0.5f; demo_slot_ = 1; }
+  if (IsKeyPressed(KEY_TWO))   { demo_.T().x = vw * 0.50f - w * 0.5f; demo_slot_ = 2; }
+  if (IsKeyPressed(KEY_THREE)) { demo_.T().x = vw * 0.75f - w * 0.5f; demo_slot_ = 3; }
+  // Re-anchor y in case the viewport was resized.
+  demo_.T().y = y;
+
+  if (IsKeyPressed(KEY_J)) demo_.JuiceUp(0.4f, 0.0f);
+
+  demo_.Move(dt);
+}
 
 void GameLayer::OnRender() {
   if (!target_valid_) return;
@@ -55,14 +80,29 @@ void GameLayer::DrawScene() {
     DrawLine(0, y, target_w_, y, Color{60, 60, 80, 255});
   }
 
-  // Spinning square at the centre — proves Update -> Render is wired.
-  const float cx = static_cast<float>(target_w_) * 0.5f;
-  const float cy = static_cast<float>(target_h_) * 0.5f;
-  const float angle = time_ * 60.0f;
-  Rectangle rect{cx, cy, 200, 200};
-  DrawRectanglePro(rect, {100, 100}, angle, Color{220, 90, 90, 255});
+  // Three slot markers (faint) so you can see where 1/2/3 send the box.
+  const float vw = static_cast<float>(target_w_);
+  for (int slot = 1; slot <= 3; ++slot) {
+    const float fx = vw * 0.25f * static_cast<float>(slot);
+    DrawLine(static_cast<int>(fx), 0, static_cast<int>(fx), target_h_,
+             Color{80, 80, 110, 255});
+  }
 
-  DrawText("Game Viewport", 16, 16, 24, RAYWHITE);
+  // The Movable box: position+size from VT (eased), centered rotation.
+  const auto& vt = demo_.VT();
+  const float draw_w = vt.w * vt.scale;
+  const float draw_h = vt.h * vt.scale;
+  Rectangle rect{vt.x + vt.w * 0.5f, vt.y + vt.h * 0.5f, draw_w, draw_h};
+  Vector2 origin{draw_w * 0.5f, draw_h * 0.5f};
+  const float deg = vt.r * 57.2957795f;  // raylib wants degrees
+  DrawRectanglePro(rect, origin, deg, Color{220, 90, 90, 255});
+
+  DrawText(TextFormat("Slot %d  (1/2/3 to move, J to juice)", demo_slot_),
+           16, 16, 20, RAYWHITE);
+  DrawText(TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s",
+                      demo_.T().x, demo_.VT().x,
+                      demo_.HasJuice() ? "yes" : "no"),
+           16, 42, 16, Color{180, 180, 200, 255});
   DrawFPS(16, target_h_ - 30);
 
   EndTextureMode();

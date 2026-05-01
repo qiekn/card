@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include "engine/movable.h"
 #include "layer.h"
 
 // Owns the offscreen RenderTexture2D the game scene draws into, then displays
@@ -42,4 +43,6 @@ class GameLayer : public Layer {
 
   // Demo scene state — replace with real game state.
   float time_ = 0.0f;
+  engine::Movable demo_;
+  int demo_slot_ = 1;  // 1/2/3 keys map to T.x at 1/4, 1/2, 3/4 of viewport
 };
