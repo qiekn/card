@@ -100,21 +100,14 @@ Joker × Edition × Seal × Sticker × Stake 5 维互相组合，每个 Joker �
 
 ### 4.2 全局集合
 
-```text
-class Game {
-  std::vector<std::unique_ptr<Movable>>  movables;
-  std::vector<Card*>                     cards;       // 非 owning
-  std::vector<CardArea*>                 cardAreas;   // 非 owning
-  std::vector<Sprite*>                   sprites;     // 非 owning
-  // ...
-};
-```
+`Game` 类持有所有 Movable 的 `unique_ptr`（owning），同时维护几个非
+owning 的 `vector<X*>` 视图（`cards / cardAreas / sprites`）——与 Balatro
+`G.I.*` 一一对应，遍历 / 加入 / 删除接口对齐 Balatro。Movable 的析构在
+destroy 时同步从视图 vector 里移除（弱引用清理）。
 
-`movables` 拥有所有 Movable（含 Card / CardArea / Sprite，多态）；
-`cards / cardAreas / sprites` 是同一对象的非 owning 视图。**与 Balatro
-`G.I.*` 一一对应**——遍历 / 加入 / 删除接口对齐 Balatro。
-
-`Movable` 的析构在 destroy 时同步从 vector 里移除（弱引用清理）。
+**所有权 = `Game::movables`**；视图只用来查询和迭代，不参与生命周期。
+具体 vector 字段名 / 接口签名等 Phase 3 实施时再敲定，本篇只锁定形式：
+**单一所有权链 + 多个非 owning 视图**。
 
 ### 4.3 何时引入 EnTT
 
