@@ -9,7 +9,7 @@
 无 C++ 改动，纯文档。完成的 gate：6 篇 `balatro/*.md` + 5 篇 `architecture/*.md` 全部存在；`port-decisions.md` 三栏完整；`shader-uniforms.md` 覆盖所有 Balatro shader 的 uniform。
 
 - [x] `balatro/01-object-node-moveable.md`
-- [ ] `balatro/02-cardarea-card.md`
+- [x] `balatro/02-cardarea-card.md`
 - [ ] `balatro/03-sprite-shader.md`
 - [ ] `balatro/04-particles.md`
 - [ ] `balatro/05-ui-system.md`
