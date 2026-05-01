@@ -15,6 +15,7 @@
 
 - [Port Decisions](./architecture/port-decisions.md)
 - [ECS vs OO](./architecture/ecs-vs-oo.md)
+- [Shader Uniforms](./architecture/shader-uniforms.md)
 
 ---
 
