@@ -1,7 +1,5 @@
 #include "game_layer.h"
 
-#include <cstdio>
-
 #include <imgui.h>
 
 #include "engine/text.h"
@@ -15,7 +13,7 @@ void GameLayer::OnAttach() {
   // before the Viewport panel reports its real size.
   EnsureTarget(1280, 720);
 
-  if (TryLoadJokerAtlas(texture_scale_)) {
+  if (atlases_.Load("assets/atlases.json", texture_scale_)) {
     applied_texture_scale_ = texture_scale_;
   }
 
@@ -27,8 +25,10 @@ void GameLayer::OnAttach() {
   constexpr float kCardH = 95.0f * 4.0f;
   const float center_x = static_cast<float>(target_w_) * 0.5f - kCardW * 0.5f;
   const float center_y = static_cast<float>(target_h_) * 0.5f - kCardH * 0.5f;
-  demo_.emplace(center_x, center_y, kCardW, kCardH, joker_atlas_,
-                /*sprite_x=*/0, /*sprite_y=*/0);
+  if (const engine::Atlas* joker = atlases_.Find("Joker")) {
+    demo_.emplace(center_x, center_y, kCardW, kCardH, *joker,
+                  /*sprite_x=*/0, /*sprite_y=*/0);
+  }
 }
 
 void GameLayer::OnDetach() {
@@ -37,17 +37,6 @@ void GameLayer::OnDetach() {
     target_valid_ = false;
   }
   demo_.reset();
-  joker_atlas_ = {};
-}
-
-bool GameLayer::TryLoadJokerAtlas(int tier) {
-  char path[128];
-  std::snprintf(path, sizeof(path),
-                "assets/textures/%dx/Jokers.png", tier);
-  engine::Atlas next{path, 71 * tier, 95 * tier};
-  if (!next.Loaded()) return false;
-  joker_atlas_ = std::move(next);
-  return true;
 }
 
 void GameLayer::OnUpdate(float dt) {
@@ -55,11 +44,11 @@ void GameLayer::OnUpdate(float dt) {
 
   // Themes panel may have flipped the tier — try to apply. On miss we
   // revert the UI value so the combo never lies about what's loaded.
-  // Atlas reload is move-assignment into the same member, so the Sprite's
-  // non-owning pointer stays valid; the only side-effect on Sprite is its
-  // src rect gets bigger / smaller at draw time via CellPx/Py.
+  // Registry reload is in-place move-assign, so the Sprite's non-owning
+  // Atlas pointer stays valid; the only side-effect is its src rect gets
+  // bigger / smaller at draw time via CellPx/Py.
   if (texture_scale_ != applied_texture_scale_) {
-    if (TryLoadJokerAtlas(texture_scale_)) {
+    if (atlases_.Load("assets/atlases.json", texture_scale_)) {
       applied_texture_scale_ = texture_scale_;
     } else {
       texture_scale_ = applied_texture_scale_;

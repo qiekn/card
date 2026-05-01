@@ -4,6 +4,7 @@
 
 #include <raylib.h>
 
+#include "engine/atlas_registry.h"
 #include "engine/sprite.h"
 #include "layer.h"
 
@@ -44,12 +45,6 @@ class GameLayer : public Layer {
   void DrawHierarchyPanel();
   void DrawConsolePanel();
 
-  // Try loading assets/textures/{tier}x/Jokers.png with cell sized to
-  // (71*tier, 95*tier). On success replaces joker_atlas_ and returns
-  // true; on failure leaves the current atlas alone. Atlas ctor already
-  // wrote a stderr line on miss.
-  bool TryLoadJokerAtlas(int tier);
-
   RenderTexture2D target_{};
   int target_w_ = 0;
   int target_h_ = 0;
@@ -71,10 +66,10 @@ class GameLayer : public Layer {
   // What tier is currently on the GPU. Stays 0 until first successful
   // load — that initial mismatch is what kicks OnAttach's load.
   int applied_texture_scale_ = 0;
-  // Atlas first (Sprite holds a non-owning pointer into it). std::optional
-  // because Sprite is move-only and constructed in OnAttach once Atlas is
-  // loaded — outside of OnAttach the slot is empty.
-  engine::Atlas joker_atlas_;
+  // Eager-loaded atlases from assets/atlases.json. Reload on tier change
+  // is in-place (move-assign into existing slots), so the borrowed
+  // Atlas* in `demo_` stays valid across the Themes panel combo flips.
+  engine::AtlasRegistry atlases_;
   std::optional<engine::Sprite> demo_;
   int demo_slot_ = 1;  // 1/2/3 keys map to T.x at 1/4, 1/2, 3/4 of viewport
 };
