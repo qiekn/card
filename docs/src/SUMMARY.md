@@ -8,6 +8,7 @@
 - [CardArea / Card](./balatro/02-cardarea-card.md)
 - [Sprite / Shader](./balatro/03-sprite-shader.md)
 - [Particles](./balatro/04-particles.md)
+- [UI System](./balatro/05-ui-system.md)
 
 # 架构决策
 
