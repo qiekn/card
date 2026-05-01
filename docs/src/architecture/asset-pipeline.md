@@ -4,8 +4,12 @@ source: Phase 2 工程基础设施——asset 同步流程
 
 # Asset Pipeline
 
-> Balatro 的资产受版权保护，**不能入仓**。每个开发者本地从自己买的 Steam
-> 装机里抽取一次，未来更新游戏时再跑一次脚本即可。
+> **策略**：本仓库为个人学习项目，不商用、不公开发布。MVP 真正用到的
+> Balatro 1x / 2x 贴图直接 vendor 到 `assets/textures/{1x,2x}/` 入仓，
+> 这样 clone 就能跑、视频演示也方便。`tools/update-balatro-assets.sh`
+> 仍保留——它把 Steam 装机里的资产抽到本地 staging dir
+> `assets/balatro/`（gitignored），方便 Balatro 版本更新后用 `diff`
+> 决定哪些贴图需要重新 vendor。
 
 ## 1 · ref-balatro 资产清单
 
@@ -27,14 +31,16 @@ resources/
 
 | 子目录 | 处理方式 |
 |--|--|
-| `textures/{1x,2x,4x}/*.png` | **直接拷贝** 到 `assets/balatro/textures/` |
-| `fonts/*.ttf` | **直接拷贝** 到 `assets/balatro/fonts/` |
-| `sounds/*.ogg` | **直接拷贝** 到 `assets/balatro/sounds/` |
+| `textures/{1x,2x}/*.png` | **vendor 入仓** 到 `assets/textures/{1x,2x}/`（MVP 实际只用到 ~15 个 atlas，先全拷过来省事）|
+| `textures/4x/*.png` | 不入仓（800 MB 太大，1080p 显示也看不出差别）|
+| `fonts/*.ttf` | 暂不导入（保留我们自己的 OpenSans，本地化阶段再换 m6x11plus + GoNoto CJK）|
+| `sounds/*.ogg` | 暂不导入，Phase 7 加音频时再决定 |
 | `shaders/*.fs` | **手工 port 到 GLSL 330** 后存到 `assets/shaders/`（不自动同步）|
-| `gamecontrollerdb.txt` | 直接拷 |
+| `gamecontrollerdb.txt` | 暂不导入，没接 gamepad |
 
-textures 占大头（1x 大约 50 MB，2x 200 MB，4x 800 MB）。MVP 用 1x 够，
-2x/4x defer 到 Phase 7 配置项。
+textures 1x ≈ 50 MB、2x ≈ 200 MB——两份都入仓让 Themes 面板的
+"Texture Scale" combo 能在运行时切（见 `project/sprite.md` Caveats）。
+4x defer 到不大可能的将来。
 
 ## 2 · 来源：Steam 装机
 
@@ -54,7 +60,8 @@ Steam 默认安装路径：
 
 ## 3 · `tools/update-balatro-assets.sh`
 
-工程基础设施 Phase 2 第一项任务。脚本责任：
+把 Steam 装机里的资产抽到本地 staging dir `assets/balatro/`（gitignored），
+方便 Balatro 版本更新后用 `diff` 决定哪些贴图需要 re-vendor。脚本责任：
 
 1. **定位** Balatro 安装（Windows / macOS / Linux 三档 + `BALATRO_PATH`
    env override）
@@ -70,34 +77,45 @@ Steam 默认安装路径：
 
 脚本要 idempotent：重跑覆盖已有文件，不删除 `assets/balatro/` 之外的内容。
 
+vendor 流程（手动，不自动化——希望开发者每次都看一眼 diff）：
+`assets/balatro/textures/1x/*.png` → 用得到的拷到 `assets/textures/1x/`，
+2x 同理。当前 MVP 把 1x、2x 整目录都 vendor 了，将来文件多了再筛。
+
 ### 3.1 验收
 
-Phase 2 完成 gate（来自 roadmap.md）：
+Phase 2 完成 gate（来自 roadmap.md，已达成）：
 
 - `tools/update-balatro-assets.sh --dry-run` 能正确列出 ≥ 50 MB 文件
 - 实跑后 `assets/balatro/textures/1x/8BitDeck.png` 存在且 71×95×52
 - `.gitignore` 含 `/assets/balatro/`
-- README 有 "First-time asset setup" 段教用户跑一次
+- README 有 "First-time asset setup" 段（仅当你想 re-sync 时跑一次）
 
 ## 4 · `.gitignore`
 
 ```text
-/assets/balatro/         # Phase 2 加：Balatro 原作资产，本地同步
+/assets/balatro/         # 脚本 staging dir：Balatro 原作资产，本地同步
 /assets/cache/           # 后期可能加：转码 / 压缩缓存
 ```
 
-`assets/shaders/`（我们手 port 的 GLSL 330）**入仓**——这是我们的成果。
+入仓的 asset 目录：
+
+- `assets/textures/{1x,2x}/`——MVP 用到的 Balatro 贴图（学习用途）
+- `assets/atlases.json`——15 个 atlas 的 (name, path, px, py) 元数据
+- `assets/themes.json`——ImGui 主题
+- `assets/icons/`、`assets/fonts/opensans/`——我们自己的 UI 资源
+- `assets/shaders/`——手工 port 的 GLSL 330（这是我们的成果）
 
 ## 5 · 启动时检查
 
-C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
+设计上原本要在 `Game::Init()` 第一件事跑 `AssertAssetsPresent()`：检查
+关键路径，缺失就 stderr 提示 + `exit(1)`。**当前实现 defer**——
+`engine::Atlas` 构造函数只 `fprintf(stderr, ...)` 一行警告 + 留空
+texture（`id == 0` 哨兵），调用方 `if (!atlas.Loaded()) return;` 跳过
+渲染，不 crash。
 
-- 检查关键路径 `assets/balatro/textures/1x/8BitDeck.png` 是否存在
-- 不存在则 `fprintf(stderr, ...)` 输出**清晰指引**：
-  「跑 `tools/update-balatro-assets.sh` 同步 Balatro 资产；详见 README」
-- 然后 `exit(1)`，不继续
-
-不要静默失败——首次构建后启动崩溃的用户体验比"提示去跑脚本"差得多。
+这是 policy debt：MVP 阶段方便迭代，后期文件多了要补回 fail-fast 校验，
+否则缺一张图只会"该卡牌不画"，靜默失败比崩溃难调试得多。Phase 6
+（解析 `cards.json`）之前补。
 
 ## 6 · Atlas 元数据
 
@@ -131,9 +149,9 @@ C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
 `game.lua:5644-5659`）defer。collabs/ 子目录里的 `collab_*` 一对对
 跟卡牌同尺寸（71×95），MVP 不接 IP 联动 —— 也 defer。
 
-**这份 JSON 入仓**——它是我们对 Balatro 资产的"接口定义"，不依赖资产
-本身。**注意位置**：放在 `assets/atlases.json`（顶层），不放 `assets/balatro/`
-里——后者被 `.gitignore`，手抄元数据要避开。
+**这份 JSON 已入仓**（`assets/atlases.json`）——它是我们对 Balatro 资产
+的"接口定义"，不依赖资产本身。注意 `px` / `py` 是 1x baseline，loader
+（`engine::Atlas`）按当前 texture scale 乘以 tier 得到实际 cell 大小。
 
 ## 7 · Sprite 网格映射（`G.P_CENTERS` 等）
 
@@ -152,7 +170,7 @@ G.P_CENTERS = {
 ```
 
 Phase 6 时把 `Card_Tables.lua` 解析成 `assets/cards.json` 入仓
-（跟 `atlases.json` 同位置，避开 gitignored `assets/balatro/`）。
+（跟 `atlases.json` 同位置）。
 
 ## 8 · 不做的事
 
@@ -164,17 +182,18 @@ Phase 6 时把 `Card_Tables.lua` 解析成 `assets/cards.json` 入仓
 
 ## 9 · Phase 顺序
 
-| Phase | asset 相关任务 |
-|--|--|
-| 2 | 写 `update-balatro-assets.sh` + `.gitignore` 加 `/assets/balatro/` + README 加 setup 段 + `atlases.json` 写完 |
-| 2 | 选 1 个 shader（推荐 `dissolve.fs`）port 到 GLSL 330，写到 `assets/shaders/` |
-| 3 | 启动时 `AssertAssetsPresent()` |
-| 4 | 加载 1 个 atlas（推荐 `Joker.png`）+ 显示 1 张卡 |
-| 4 | port 第二个 shader（推荐 `holo.fs`） |
-| 6 | 解析 `Card_Tables.lua` → `cards.json` |
-| 7+ | port 余下 8 个卡牌特效 shader |
-| 7+ | 加 2x atlas 选项（settings 切换） |
-| 8+ | 4x atlas + 视频素材（如保留）|
+| Phase | asset 相关任务 | 状态 |
+|--|--|--|
+| 2 | 写 `update-balatro-assets.sh` + `.gitignore` 加 `/assets/balatro/` + `atlases.json` 写完 | done |
+| 2 | 选 1 个 shader（推荐 `dissolve.fs`）port 到 GLSL 330，写到 `assets/shaders/` | defer |
+| 3 | 启动时 `AssertAssetsPresent()` | defer（Atlas ctor fprintf+noop 兜底）|
+| 4 | 加载 1 个 atlas（`Jokers.png`）+ 显示 1 张卡 | done |
+| 4 | port 第二个 shader（`holo.fs`） | defer |
+| 4 | vendor 1x + 2x textures + Themes 面板 "Texture Scale" combo | done |
+| 6 | 解析 `Card_Tables.lua` → `cards.json` | todo |
+| 7+ | port 余下 8 个卡牌特效 shader | todo |
+| 8+ | 4x atlas + 视频素材（如保留）| 不计划 |
 
 `update-balatro-assets.sh` 的写法是 Phase 2 实施时定，本篇只锁定**架构
-形式**：单脚本 + 入仓 atlases.json + 启动校验 + 不动 shader 自动同步。
+形式**：单脚本（staging）+ 手动 vendor + 入仓 atlases.json + 不动 shader
+自动同步。

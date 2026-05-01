@@ -52,10 +52,15 @@ If you forgot `--recurse-submodules` at clone time:
 git submodule update --init --recursive
 ```
 
-## First-time asset setup
+## Assets
 
-Balatro's textures, fonts and audio are copyrighted and **not** in the
-repo. Each developer extracts them once from their own Steam install:
+The Balatro 1x and 2x texture atlases the MVP needs are vendored under
+`assets/textures/{1x,2x}/` so a fresh clone runs out of the box. This is
+a private learning project — assets are not redistributed elsewhere.
+
+If you want to re-sync after a Balatro version bump, the helper script
+extracts your local Steam install into a gitignored staging dir
+(`assets/balatro/`) so you can diff and re-vendor selectively:
 
 ```sh
 # Default Steam paths are auto-detected on Windows / macOS / Linux.
@@ -64,13 +69,9 @@ repo. Each developer extracts them once from their own Steam install:
 ./tools/update-balatro-assets.sh              # actually copy
 ```
 
-This populates `assets/balatro/{textures/1x,fonts,sounds}` and the
-controller DB. Re-run after a Balatro update; the script is idempotent.
-Add `--with-2x` / `--with-4x` for higher-resolution atlases (optional,
-MVP uses 1x).
-
-`assets/balatro/` is gitignored. The hand-ported GLSL 330 shaders under
-`assets/shaders/` **are** in the repo — those are our work, not Balatro's.
+`assets/shaders/` (hand-ported GLSL 330) and `assets/atlases.json` (atlas
+metadata copied out of `game.lua`) are also in the repo — those are our
+work, not Balatro's.
 
 See `docs/src/architecture/asset-pipeline.md` for the full pipeline.
 
@@ -132,7 +133,11 @@ cmake --build build
 card/
 ├── assets/              # Runtime assets (loaded relative to CWD)
 │   ├── icons/           # favicon.png / favicon.svg
-│   └── fonts/opensans/  # ImGui UI font
+│   ├── fonts/opensans/  # ImGui UI font
+│   ├── textures/{1x,2x}/  # Vendored Balatro atlases (learning use)
+│   ├── shaders/         # Hand-ported GLSL 330
+│   ├── atlases.json     # Atlas metadata (name, path, px, py)
+│   └── themes.json      # ImGui themes
 ├── cmake/               # CMake helpers (e.g. EnableCxxImportStd)
 ├── deps/                # Git submodules — third-party libs
 │   ├── raylib/          # raylib 6.0
