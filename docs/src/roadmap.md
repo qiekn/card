@@ -46,12 +46,27 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 
 ## Phase 3 — 引擎抽象 (Movable T/VT)
 
-- [ ] `src/engine/transform.h`
-- [ ] `src/engine/movable.h/.cpp` (Move / HardSetT / JuiceUp)
-- [ ] 键盘 1/2/3 切换 T.x，VT.x 平滑跟随的 demo
+- [x] `src/engine/transform.h`
+- [x] `src/engine/movable.h/.cpp` (Move / HardSetT / JuiceUp)
+- [x] 键盘 1/2/3 切换 T.x，VT.x 平滑跟随的 demo
 
 ### 经验教训
-_(待填)_
+
+- **`Transform` 撞 raylib**：raylib 也定义 `Transform`（骨骼蒙皮 4×4 + 四元数，
+  `raylib.h:451`）。第一次 include 既有 raylib 又有我们 transform.h 的
+  .cpp 立刻 redefinition error。整个 engine/ 进 `engine::` namespace 解决。
+  现有 src/{game,layer,*}.cpp 还是全局 namespace —— 风格不一致，但 engine/
+  这一层加 namespace 更安全（未来还会引入 `engine::Sprite` / `Camera` 等）。
+- **MoveR 必须在 MoveXY 后**：sway 项 `0.015 * vel.x / dt` 读 `velocity_.x`，
+  顺序错了 sway 永远 0。lua 顺序照抄即可。
+- **MoveScale 必须在 MoveJuice 后**：juice 通过加进 `des_scale` 注入 wobble，
+  不直接写 VT.scale ——这样移动中 + juice 不打架。
+- **ease 公式的 `(T - VT) * 35 * dt`**：35 跟 50（K_xy）是两个独立的口味
+  常数。35 是力的强度（位置误差转 velocity 增量），50 是衰减速率。两个都
+  要原样抄，改一个手感就变。
+- **snap 阈值 0.01 / 0.001 / 0.001**：浮点不收敛只能 if-snap 强咬死。
+  位置阈值粗一档（0.01 game unit ≈ 半像素以下），旋转 / scale 严一档
+  （转动 / 缩放更显眼）。
 
 ## Phase 4 — Sprite + 一张卡
 
