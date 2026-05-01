@@ -4,6 +4,8 @@
 
 #include "transform.h"
 
+namespace engine {
+
 // Movable — base for any object that wants smooth motion.
 //
 // Two transforms: T is the target (set instantly by gameplay), VT is the
@@ -101,3 +103,5 @@ class Movable {
   void MoveScale(float dt, float exp_scale);
   void MoveWH(float dt);
 };
+
+}  // namespace engine

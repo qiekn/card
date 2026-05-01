@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+namespace engine {
+
 namespace {
 
 // G.exp_times.* recomputed each frame in Balatro (game.lua:8181-8187).
@@ -193,3 +195,5 @@ void Movable::MoveWH(float dt) {
   vt_.w = std::clamp(vt_.w, 0.0f, t_.w);
   vt_.h = std::clamp(vt_.h, 0.0f, t_.h);
 }
+
+}  // namespace engine
