@@ -13,13 +13,21 @@ void GameLayer::OnAttach() {
   // before the Viewport panel reports its real size.
   EnsureTarget(1280, 720);
 
-  // Movable demo: a 200x200 box that eases between three slots.
-  // T.x set instantly by 1/2/3 keys; VT.x exp-eases each frame.
-  const float w = 200.0f;
-  const float h = 200.0f;
+  // Load the Joker atlas. 71x95 per cell — Balatro's universal card size.
+  // Path is relative to CWD (project root in dev), same convention as the
+  // text module's font paths.
+  joker_atlas_ = engine::Atlas{"assets/balatro/textures/1x/Jokers.png", 71, 95};
+
+  // Sprite demo: the vanilla Joker (sprite_pos {0,0}) at 4x cell size so it
+  // reads at typical viewport sizes. T.x set instantly by 1/2/3 keys; VT.x
+  // exp-eases each frame via Movable::Move.
+  constexpr float kCardScale = 4.0f;
+  const float w = 71.0f * kCardScale;
+  const float h = 95.0f * kCardScale;
   const float center_x = static_cast<float>(target_w_) * 0.5f - w * 0.5f;
   const float center_y = static_cast<float>(target_h_) * 0.5f - h * 0.5f;
-  demo_.HardSetT(center_x, center_y, w, h);
+  demo_.emplace(center_x, center_y, w, h, joker_atlas_, /*sprite_x=*/0,
+                /*sprite_y=*/0);
 }
 
 void GameLayer::OnDetach() {
@@ -27,25 +35,29 @@ void GameLayer::OnDetach() {
     UnloadRenderTexture(target_);
     target_valid_ = false;
   }
+  demo_.reset();
+  joker_atlas_ = {};
 }
 
 void GameLayer::OnUpdate(float dt) {
   time_ += dt;
 
+  if (!demo_) return;
+
   // Demo controls — 1/2/3 set T.x to 1/4, 1/2, 3/4 of viewport.
-  // VT.x exp-eases toward T.x via demo_.Move(dt) below.
-  const float w = demo_.T().w;
-  const float y = static_cast<float>(target_h_) * 0.5f - demo_.T().h * 0.5f;
+  // VT.x exp-eases toward T.x via demo_->Move(dt) below.
+  const float w = demo_->T().w;
+  const float y = static_cast<float>(target_h_) * 0.5f - demo_->T().h * 0.5f;
   const float vw = static_cast<float>(target_w_);
-  if (IsKeyPressed(KEY_ONE))   { demo_.T().x = vw * 0.25f - w * 0.5f; demo_slot_ = 1; }
-  if (IsKeyPressed(KEY_TWO))   { demo_.T().x = vw * 0.50f - w * 0.5f; demo_slot_ = 2; }
-  if (IsKeyPressed(KEY_THREE)) { demo_.T().x = vw * 0.75f - w * 0.5f; demo_slot_ = 3; }
+  if (IsKeyPressed(KEY_ONE))   { demo_->T().x = vw * 0.25f - w * 0.5f; demo_slot_ = 1; }
+  if (IsKeyPressed(KEY_TWO))   { demo_->T().x = vw * 0.50f - w * 0.5f; demo_slot_ = 2; }
+  if (IsKeyPressed(KEY_THREE)) { demo_->T().x = vw * 0.75f - w * 0.5f; demo_slot_ = 3; }
   // Re-anchor y in case the viewport was resized.
-  demo_.T().y = y;
+  demo_->T().y = y;
 
-  if (IsKeyPressed(KEY_J)) demo_.JuiceUp(0.4f, 0.0f);
+  if (IsKeyPressed(KEY_J)) demo_->JuiceUp(0.4f, 0.0f);
 
-  demo_.Move(dt);
+  demo_->Move(dt);
 }
 
 void GameLayer::OnRender() {
@@ -88,18 +100,16 @@ void GameLayer::DrawScene() {
     DrawLine(0, y, target_w_, y, kGridColor);
   }
 
-  // The Movable box: position+size from VT (eased), centered rotation.
-  const auto& vt = demo_.VT();
-  const float draw_w = vt.w * vt.scale;
-  const float draw_h = vt.h * vt.scale;
-  Rectangle rect{vt.x + vt.w * 0.5f, vt.y + vt.h * 0.5f, draw_w, draw_h};
-  Vector2 origin{draw_w * 0.5f, draw_h * 0.5f};
-  const float deg = vt.r * 57.2957795f;  // raylib wants degrees
-  DrawRectanglePro(rect, origin, deg, Color{220, 90, 90, 255});
+  // The Sprite demo: position+size from VT (eased), centered rotation,
+  // atlas slice picked at OnAttach.
+  if (demo_) demo_->Render();
 
   engine::DrawTextBold(TextFormat("Slot %d  (1/2/3 to move, J to juice)", demo_slot_), Vector2{16, 16}, 18, RAYWHITE);
   engine::DrawText(
-      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s", demo_.T().x, demo_.VT().x, demo_.HasJuice() ? "yes" : "no"),
+      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s",
+                 demo_ ? demo_->T().x : 0.0f,
+                 demo_ ? demo_->VT().x : 0.0f,
+                 (demo_ && demo_->HasJuice()) ? "yes" : "no"),
       Vector2{16, 44}, 18, Color{180, 180, 200, 255});
 
   EndTextureMode();

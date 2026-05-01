@@ -1,8 +1,10 @@
 #pragma once
 
+#include <optional>
+
 #include <raylib.h>
 
-#include "engine/movable.h"
+#include "engine/sprite.h"
 #include "layer.h"
 
 // Owns the offscreen RenderTexture2D the game scene draws into, then displays
@@ -48,6 +50,10 @@ class GameLayer : public Layer {
   // Demo scene state — replace with real game state.
   float time_ = 0.0f;
   Color background_color_{30, 30, 46, 255};  // overridden per-frame by Game
-  engine::Movable demo_;
+  // Atlas first (Sprite holds a non-owning pointer into it). std::optional
+  // because Sprite is move-only and constructed in OnAttach once Atlas is
+  // loaded — outside of OnAttach the slot is empty.
+  engine::Atlas joker_atlas_;
+  std::optional<engine::Sprite> demo_;
   int demo_slot_ = 1;  // 1/2/3 keys map to T.x at 1/4, 1/2, 3/4 of viewport
 };
