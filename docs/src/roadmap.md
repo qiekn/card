@@ -26,13 +26,23 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 
 ## Phase 2 — 工程基础设施
 
-- [ ] `tools/update-balatro-assets.sh` 写完 + 验证 dry-run
-- [ ] `.gitignore` 加 `/assets/balatro/`
-- [ ] `README.md` 加 "First-time asset setup" 段
-- [ ] 1 个 shader（推荐 holo.fs）改成 raylib 330 编译通过
+- [x] `tools/update-balatro-assets.sh` 写完 + 验证 dry-run
+- [x] `.gitignore` 加 `/assets/balatro/`
+- [x] `README.md` 加 "First-time asset setup" 段
+- [x] 1 个 shader（推荐 holo.fs）改成 raylib 330 编译通过
 
 ### 经验教训
-_(待填)_
+
+- `update-balatro-assets.sh`: PowerShell 造的 zip 用 backslash 路径分隔符，
+  unzip 退 1（warning）会被 `set -e` 当 fatal 杀掉——只把 exit ≥ 2 当
+  真错误。用 `BALATRO_PATH` 指向 `ref-balatro/` 临时打包的 zip 就能本地
+  end-to-end dry-run 验证（无须真 Steam 装机）。
+- shader port: dissolve 选作头炮的判断对——共享 uniform（dissolve / time
+  / texture_details / image_details / shadow / burn_colour_*）和共享 vertex
+  hover transform 全部一次走通。当下没装 glslangValidator，编译验证延到
+  Phase 3 起 raylib `LoadShader` 时做。`assets/shaders/common.{vs,glsl}`
+  抽取留到第二个卡牌特效 shader（holo）port 时一起做，避免单 shader 时
+  过早抽象。
 
 ## Phase 3 — 引擎抽象 (Movable T/VT)
 
