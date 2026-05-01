@@ -105,7 +105,7 @@ C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
 §2.2 列出）。这些数据**不来自资产文件本身**——Balatro 是把元数据硬编码在
 代码里。
 
-我们项目的 `assets/balatro/atlases.json`（或 `.toml`）需要**手抄**这 15 项：
+我们项目的 `assets/atlases.json`（或 `.toml`）需要**手抄**这 15 项：
 
 ```text
 [
@@ -131,7 +131,9 @@ C++ 端 `Game::Init()` 第一件事是 `AssertAssetsPresent()`：
 `game.lua:5644-5659`）defer。collabs/ 子目录里的 `collab_*` 一对对
 跟卡牌同尺寸（71×95），MVP 不接 IP 联动 —— 也 defer。
 
-**这份 JSON 入仓**——它是我们对 Balatro 资产的"接口定义"，不依赖资产本身。
+**这份 JSON 入仓**——它是我们对 Balatro 资产的"接口定义"，不依赖资产
+本身。**注意位置**：放在 `assets/atlases.json`（顶层），不放 `assets/balatro/`
+里——后者被 `.gitignore`，手抄元数据要避开。
 
 ## 7 · Sprite 网格映射（`G.P_CENTERS` 等）
 
@@ -149,7 +151,8 @@ G.P_CENTERS = {
 }
 ```
 
-Phase 6 时把 `Card_Tables.lua` 解析成 `assets/balatro/cards.json` 入仓。
+Phase 6 时把 `Card_Tables.lua` 解析成 `assets/cards.json` 入仓
+（跟 `atlases.json` 同位置，避开 gitignored `assets/balatro/`）。
 
 ## 8 · 不做的事
 
