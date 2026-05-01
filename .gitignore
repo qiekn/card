@@ -7,5 +7,8 @@ __pycache__/
 # game refs
 /ref-balatro/
 
+# Balatro assets — synced locally via tools/update-balatro-assets.sh
+/assets/balatro/
+
 # mdBook build output
 /docs/book/
