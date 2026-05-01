@@ -18,7 +18,7 @@
 - [x] `architecture/ecs-vs-oo.md`
 - [x] `architecture/shader-uniforms.md`
 - [x] `architecture/hud-rendering.md`
-- [ ] `architecture/asset-pipeline.md`
+- [x] `architecture/asset-pipeline.md`
 
 ### 经验教训
 
