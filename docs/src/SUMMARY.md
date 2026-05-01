@@ -13,6 +13,8 @@
 
 # 架构决策
 
+- [Port Decisions](./architecture/port-decisions.md)
+
 ---
 
 [Roadmap](./roadmap.md)
