@@ -96,7 +96,7 @@ clang-format 走，CI 不强制（暂无 lint job），靠 dev 自觉 + editor o
 Windows API 行为更一致；MINGW64 用旧 msvcrt，时区 / locale 行为有怪坑。
 新机器装 MSYS2 默认就开 UCRT64。
 
-## 7 · 已知遗留
+## 7 · Caveats
 
 - **CI 没有 build job**：当前 `.github/workflows/` 只有 mdbook 部署。
   Phase 3 真开始有 C++ 代码时建议加一个 `ubuntu-latest + clang + ninja`
