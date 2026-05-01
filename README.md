@@ -52,6 +52,28 @@ If you forgot `--recurse-submodules` at clone time:
 git submodule update --init --recursive
 ```
 
+## First-time asset setup
+
+Balatro's textures, fonts and audio are copyrighted and **not** in the
+repo. Each developer extracts them once from their own Steam install:
+
+```sh
+# Default Steam paths are auto-detected on Windows / macOS / Linux.
+# Override with BALATRO_PATH=/custom/path if needed.
+./tools/update-balatro-assets.sh --dry-run    # preview
+./tools/update-balatro-assets.sh              # actually copy
+```
+
+This populates `assets/balatro/{textures/1x,fonts,sounds}` and the
+controller DB. Re-run after a Balatro update; the script is idempotent.
+Add `--with-2x` / `--with-4x` for higher-resolution atlases (optional,
+MVP uses 1x).
+
+`assets/balatro/` is gitignored. The hand-ported GLSL 330 shaders under
+`assets/shaders/` **are** in the repo — those are our work, not Balatro's.
+
+See `docs/src/architecture/asset-pipeline.md` for the full pipeline.
+
 ## Other Windows setups
 
 ### Non-MSYS2 (LLVM-only)
