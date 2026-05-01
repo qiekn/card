@@ -26,12 +26,20 @@ A 文档（`balatro/` + `architecture/`）已在 Phase 1 冻结：写 lua 行为
 
 ## 写作约定
 
-继承自 A 文档（`docs/src/README.md` §写作约定），有两条调整：
+继承自 A 文档（`docs/src/README.md` §写作约定），有几条调整：
 
 - **frontmatter** 的 `source:` 字段：A 文档指向 `ref-balatro/<file>:<line>`；
   B 文档指向我们仓内 `src/<file>` 或子系统名。
 - **port checklist 四档**（keep / rewrite / drop / defer）只在 A 文档用；
-  B 文档结尾用"接口边界"或"已知遗留"代替。
+  B 文档结尾用"接口边界"或 caveats 代替。
+- **常用工程术语保留英文**：pipeline / shader / hook / handle / backend /
+  viewport / vertex / texture / atlas / batch / event / overlay 等不翻译，
+  代码 / API / stack 都是英文，混读时英文反而流畅。
+- **叙事风格**：讲"系统从无到有怎么搭"型笔记（transform.md / movable.md
+  / sprite.md / card.md ...）参考 *Ray Tracing in One Weekend* —— 线性
+  增量、从代码片段出发引出概念、第一人称 we、章节短小、能跑就贴运行
+  结果。reference 性质的（code-layout.md / build-system.md）保留表格 +
+  bullet OK。
 
 其它一致：
 - 单篇 ≤300 行，超了拆
