@@ -11,7 +11,7 @@
 - [x] `balatro/01-object-node-moveable.md`
 - [x] `balatro/02-cardarea-card.md`
 - [x] `balatro/03-sprite-shader.md`
-- [ ] `balatro/04-particles.md`
+- [x] `balatro/04-particles.md`
 - [ ] `balatro/05-ui-system.md`
 - [ ] `balatro/06-draw-pipeline.md`
 - [ ] `architecture/port-decisions.md`
