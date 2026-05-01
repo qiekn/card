@@ -14,11 +14,20 @@ Balatro 的引擎抽象只有三层，从下到上：`Object → Node → Moveab
 ```lua
 function Object:extend()
   local cls = {}
-  for k,v in pairs(self) do if k:find("__") == 1 then cls[k] = v end end
-  cls.__index = cls; cls.super = self
-  setmetatable(cls, self); return cls
+  for k, v in pairs(self) do
+    if k:find("__") == 1 then cls[k] = v end
+  end
+  cls.__index = cls
+  cls.super = self
+  setmetatable(cls, self)
+  return cls
 end
-function Object:__call(...) local o = setmetatable({}, self); o:init(...); return o end
+
+function Object:__call(...)
+  local o = setmetatable({}, self)
+  o:init(...)
+  return o
+end
 ```
 
 调用 `Foo()` 等价于 `local o = setmetatable({}, Foo); o:init(...)`。**C++ 端不需要这层**——直接写 class + virtual。`super` 字段对应 C++ 的基类访问。
@@ -83,19 +92,23 @@ function Node:drag() end
 
 ### 字段
 ```lua
-self.T  = { x, y, w, h, r, scale }       -- 目标 transform（瞬时设置）
-self.VT = { x, y, w, h, r, scale }       -- 可见 transform（每帧 ease）
+self.T  = { x, y, w, h, r, scale }    -- 目标 transform（瞬时设置）
+self.VT = { x, y, w, h, r, scale }    -- 可见 transform（每帧 ease）
 self.velocity = { x, y, r, scale, mag }
 self.role = {
-  role_type = "Major",                   -- Major | Minor | Glued
-  major  = nil,                          -- 当 Minor 时指向 Major Movable
-  offset = {x=0, y=0},
-  xy_bond = "Strong", wh_bond = "Strong", r_bond = "Strong", scale_bond = "Strong",
+  role_type = "Major",                -- Major | Minor | Glued
+  major     = nil,                    -- 当 Minor 时指 Major
+  offset    = { x = 0, y = 0 },
+  xy_bond    = "Strong",              -- Strong = 完全继承
+  wh_bond    = "Strong",              -- Weak   = 自己 ease
+  r_bond     = "Strong",
+  scale_bond = "Strong",
 }
 self.alignment = { type = "a", offset, prev_type, prev_offset }
-self.juice = nil                          -- 瞬时 squash & stretch 数据
-self.pinch = { x = false, y = false }     -- VT.w / VT.h 是否往 0 收
-self.shadow_parrallax = { x, y = -1.5 }; self.shadow_height = 0.2
+self.juice = nil                      -- 瞬时 squash & stretch
+self.pinch = { x = false, y = false } -- VT.w/h 是否往 0 收
+self.shadow_parrallax = { x, y = -1.5 }
+self.shadow_height = 0.2
 ```
 
 ### 指数 ease（核心公式，`moveable.lua:453-480`）
@@ -107,16 +120,17 @@ self.VT.x = self.VT.x + self.velocity.x
 ```
 - `G.exp_times.xy` 是衰减系数（接近 1 = 慢、平稳；接近 0 = 快但抖）
 - 约束 `velocity.mag` 不超过 `G.exp_times.max_vel`，避免被弹太远
-- `if abs(VT.x - T.x) < 0.01 and abs(velocity.x) < 0.01: VT.x = T.x; velocity.x = 0` —— 终值 snap
+- 终值 snap：当 `|VT.x - T.x| < 0.01` 且 `|velocity.x| < 0.01` 时
+  直接令 `VT.x = T.x`、`velocity.x = 0`，避免无限小抖
 
 **`G.exp_times.*` 每帧重新算**（`game.lua:8181-8187`），保证 frame-rate independent：
 ```lua
-G.exp_times.xy    = math.exp(-50  * self.real_dt)   -- 平移/缩放越多，系数越小（收敛越快）
-G.exp_times.scale = math.exp(-60  * self.real_dt)
-G.exp_times.r     = math.exp(-190 * self.real_dt)   -- 旋转衰减最快
+G.exp_times.xy      = math.exp(-50  * self.real_dt)
+G.exp_times.scale   = math.exp(-60  * self.real_dt)
+G.exp_times.r       = math.exp(-190 * self.real_dt)  -- 旋转衰减最快
 G.exp_times.max_vel = 70 * move_dt
 ```
-即：dt = 0 时 `xy = 1`（不动）；dt = 1/60 时 `xy ≈ 0.43`（每帧把误差消减 57%）。这套常量直接抄到 C++ 即可。
+即：`dt = 0` 时 `xy = 1`（不动）；`dt = 1/60` 时 `xy ≈ 0.43`（每帧把误差消减 57%）。这套常量直接抄到 C++ 即可。
 
 旋转 / scale / w-h 各有类似但参数不同的 ease（`move_r`, `move_scale`, `move_wh`）。
 
