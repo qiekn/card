@@ -105,12 +105,10 @@ void Movable::MoveJuice() {
   }
   const float t = elapsed_ - juice_->start_time;
   const float duration = juice_->end_time - juice_->start_time;
-  const float fade = std::max(
-      0.0f, (juice_->end_time - elapsed_) / duration);
+  const float fade = std::max(0.0f, (juice_->end_time - elapsed_) / duration);
 
   // scale envelope: sin * fade^3 (cubic falloff, sharper landing).
-  juice_->scale = juice_->scale_amt * std::sin(kJuiceScaleFreq * t)
-                * fade * fade * fade;
+  juice_->scale = juice_->scale_amt * std::sin(kJuiceScaleFreq * t) * fade * fade * fade;
   // r envelope: sin * fade^2 (quadratic — softer rotation tail).
   juice_->r = juice_->r_amt * std::sin(kJuiceRFreq * t) * fade * fade;
 }
@@ -120,10 +118,8 @@ void Movable::MoveXY(float dt, float exp_xy, float max_vel) {
   const bool need_y = (t_.y != vt_.y) || (std::abs(velocity_.y) > kSnapXY);
   if (!need_x && !need_y) return;
 
-  velocity_.x = exp_xy * velocity_.x
-              + (1.0f - exp_xy) * (t_.x - vt_.x) * kXyGain * dt;
-  velocity_.y = exp_xy * velocity_.y
-              + (1.0f - exp_xy) * (t_.y - vt_.y) * kXyGain * dt;
+  velocity_.x = exp_xy * velocity_.x + (1.0f - exp_xy) * (t_.x - vt_.x) * kXyGain * dt;
+  velocity_.y = exp_xy * velocity_.y + (1.0f - exp_xy) * (t_.y - vt_.y) * kXyGain * dt;
 
   // Clamp velocity magnitude — prevents distant T jumps from launching VT
   // across the screen in one frame. Pure 2D vector clamp.
@@ -156,8 +152,7 @@ void Movable::MoveScale(float dt, float exp_scale) {
     return;
   }
   stationary_ = false;
-  velocity_.scale = exp_scale * velocity_.scale
-                  + (1.0f - exp_scale) * (des_scale - vt_.scale);
+  velocity_.scale = exp_scale * velocity_.scale + (1.0f - exp_scale) * (des_scale - vt_.scale);
   vt_.scale += velocity_.scale;
 }
 
@@ -183,10 +178,8 @@ void Movable::MoveWH(float dt) {
   // pinch.x true: ease VT.w toward 0; false: ease toward T.w.
   // Constant velocity (8 * dt * T.w/h), not exp ease — pinch needs to feel
   // mechanical (flip animation) not springy.
-  const bool need_w = (t_.w != vt_.w && !pinch_x_)
-                   || (vt_.w > 0.0f && pinch_x_);
-  const bool need_h = (t_.h != vt_.h && !pinch_y_)
-                   || (vt_.h > 0.0f && pinch_y_);
+  const bool need_w = (t_.w != vt_.w && !pinch_x_) || (vt_.w > 0.0f && pinch_x_);
+  const bool need_h = (t_.h != vt_.h && !pinch_y_) || (vt_.h > 0.0f && pinch_y_);
   if (!need_w && !need_h) return;
 
   stationary_ = false;
