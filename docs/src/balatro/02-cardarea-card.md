@@ -248,8 +248,10 @@ function Card:draw(layer)
 end
 ```
 
-`Game:draw()` **两遍**遍历所有 Card：第一遍 `layer="shadow"` 把所有阴影
-画到底层，第二遍 `layer="card"` 画卡面 —— 避免阴影互相遮挡（详见 06 笔记）。
+`Card:draw(layer="both")` **单次调用内部分两段**：先走 `layer="shadow"`
+分支画阴影，再走 `layer="card"` 分支画卡面。`Game:draw()` 对 `G.I.CARD`
+只遍历一次——shadow 不被自己卡面遮挡靠的是这种"内部分段 + 子 Sprite
+绘制顺序"，不是外层两遍循环（详见 06 笔记）。
 
 shader uniform `send_to_shader[1] = VT.r*3 + TIMERS.REAL/28
 + juice.r*20 + tilt_var.amt` 在这里准备，但 `setShader` 上传发生在子
