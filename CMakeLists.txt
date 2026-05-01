@@ -62,6 +62,7 @@ target_include_directories(imgui PUBLIC deps/imgui deps/imgui/backends)
 target_include_directories(imgui PRIVATE deps/raylib/src/external/glfw/include)
 
 add_executable(${PROJECT_NAME}
+  src/engine/movable.cpp
   src/game.cpp
   src/game_layer.cpp
   src/imgui_layer.cpp
