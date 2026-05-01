@@ -1,0 +1,17 @@
+[
+  { "name": "cards_1",    "path": "8BitDeck.png",        "px": 71,  "py": 95 },
+  { "name": "cards_2",    "path": "8BitDeck_opt2.png",   "px": 71,  "py": 95 },
+  { "name": "centers",    "path": "Enhancers.png",       "px": 71,  "py": 95 },
+  { "name": "Joker",      "path": "Jokers.png",          "px": 71,  "py": 95 },
+  { "name": "Tarot",      "path": "Tarots.png",          "px": 71,  "py": 95 },
+  { "name": "Voucher",    "path": "Vouchers.png",        "px": 71,  "py": 95 },
+  { "name": "Booster",    "path": "boosters.png",        "px": 71,  "py": 95 },
+  { "name": "ui_1",       "path": "ui_assets.png",       "px": 18,  "py": 18 },
+  { "name": "ui_2",       "path": "ui_assets_opt2.png",  "px": 18,  "py": 18 },
+  { "name": "balatro",    "path": "balatro.png",         "px": 333, "py": 216 },
+  { "name": "gamepad_ui", "path": "gamepad_ui.png",      "px": 32,  "py": 32 },
+  { "name": "icons",      "path": "icons.png",           "px": 66,  "py": 66 },
+  { "name": "tags",       "path": "tags.png",            "px": 34,  "py": 34 },
+  { "name": "stickers",   "path": "stickers.png",        "px": 71,  "py": 95 },
+  { "name": "chips",      "path": "chips.png",           "px": 29,  "py": 29 }
+]
