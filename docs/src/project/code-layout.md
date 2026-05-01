@@ -15,7 +15,7 @@ source: src/{main,game,layer,layer_stack,game_layer,imgui_layer}.{h,cpp}
 | `game.{h,cpp}` | 应用生命周期：Init / Tick / Shutdown |
 | `layer.h` | `Layer` 抽象基类 |
 | `layer_stack.{h,cpp}` | `LayerStack` 容器：layers + overlays |
-| `imgui_layer.{h,cpp}` | ImGui 后端 + 主题 + 默认 docking 布局 |
+| `imgui_layer.{h,cpp}` | ImGui backend + themes + 默认 docking 布局 |
 | `game_layer.{h,cpp}` | 游戏主层：拥有离屏 RenderTexture，画到 Viewport 面板 |
 
 ## 2 · `Game` 生命周期
@@ -33,7 +33,7 @@ struct Game {
 
 关键决策：
 
-- **Game 自己拿 raylib window 句柄**（不抽掉）。Phase 3 加 `transform.h` 时，
+- **Game 自己拿 raylib window handle**（不抽掉）。Phase 3 加 `transform.h` 时，
   raylib 的全局 `GetScreenWidth()` / `GetFrameTime()` 直接进 layer，不引入
   额外的 wrapper。这是 raylib 风格，违反 Balatro 的 OO 模板但更轻。
 - **borderless fullscreen** 独立成 `ToggleBorderless()`（`game.cpp:103-125`）：
@@ -58,8 +58,8 @@ class Layer {
 ```
 
 5 个虚函数全部默认空实现——子类按需覆盖。**不强制**让每个 layer 覆盖每个
-钩子。事件系统目前没有（注释里说"如果以后加，按 reverse 顺序遍历让 overlay
-先吃事件"）。
+hook。event 系统目前没有（注释里说"如果以后加，按 reverse 顺序遍历让 overlay
+先吃 event"）。
 
 ## 4 · `LayerStack` — layers vs overlays
 
@@ -88,10 +88,10 @@ ImGui 是 overlay（`game.cpp:84-85` 反过来——业务原因看下面）：
 才能让 GameLayer 的 Viewport 窗口在第一帧就 dock 进来。这是 ImGui DockBuilder
 API 的硬约束。
 
-> **已知遗留**：`LayerStack` 的 `push_overlay` 目前没人用——所有 layer 都用
+> **Caveat**：`LayerStack` 的 `push_overlay` 目前没人用——所有 layer 都用
 > `push_layer`。等真有需要"绝对画在最上面"的 layer（debug overlay？）再启用。
 
-## 5 · `Render` 流水线
+## 5 · `Render` pipeline
 
 `game.cpp:127-145` 的顺序很关键：
 
@@ -123,7 +123,7 @@ EndDrawing();
 `BeginTextureMode` → DrawScene → `EndTextureMode`。
 `OnImGuiRender` → 把 `target_.texture` 当 ImGui Image 贴在 Viewport 窗口。
 
-> **已知遗留**：`time_ = 0.0f`（`game_layer.h:44`）是 demo 用，渲染一个
+> **Caveat**：`time_ = 0.0f`（`game_layer.h:44`）是 demo 用，渲染一个
 > 旋转方块。Phase 3 起换成真业务 state（先 Movable，再 Card）。
 
 ## 7 · 接口边界（什么会改、什么不会）
