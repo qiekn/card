@@ -176,7 +176,8 @@ void ImGuiLayer::DrawMainMenuBar() {
 }
 
 void ImGuiLayer::DrawInspectorPanel() {
-  if (!ImGui::Begin("Inspector", &show_inspector_, ImGuiWindowFlags_NoCollapse)) {
+  if (!show_inspector_) return;
+  if (!ImGui::Begin("Inspector", nullptr, ImGuiWindowFlags_NoCollapse)) {
     ImGui::End();
     return;
   }
@@ -185,7 +186,8 @@ void ImGuiLayer::DrawInspectorPanel() {
 }
 
 void ImGuiLayer::DrawThemesPanel() {
-  if (!ImGui::Begin("Themes", &show_themes_, ImGuiWindowFlags_NoCollapse)) {
+  if (!show_themes_) return;
+  if (!ImGui::Begin("Themes", nullptr, ImGuiWindowFlags_NoCollapse)) {
     ImGui::End();
     return;
   }

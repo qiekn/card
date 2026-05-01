@@ -109,13 +109,15 @@ void GameLayer::DrawScene() {
 }
 
 void GameLayer::DrawViewportPanel() {
+  if (!show_viewport_) return;
+
   ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar |
                            ImGuiWindowFlags_NoScrollWithMouse;
   if (viewport_no_titlebar_) flags |= ImGuiWindowFlags_NoTitleBar;
 
   // Zero padding so the framebuffer fills the entire panel.
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
-  bool open = ImGui::Begin("Viewport", &show_viewport_, flags);
+  bool open = ImGui::Begin("Viewport", nullptr, flags);
   ImGui::PopStyleVar();
 
   if (!open) {
@@ -146,7 +148,8 @@ void GameLayer::DrawViewportPanel() {
 }
 
 void GameLayer::DrawHierarchyPanel() {
-  if (!ImGui::Begin("Hierarchy", &show_hierarchy_, ImGuiWindowFlags_NoCollapse)) {
+  if (!show_hierarchy_) return;
+  if (!ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_NoCollapse)) {
     ImGui::End();
     return;
   }
@@ -160,7 +163,8 @@ void GameLayer::DrawHierarchyPanel() {
 }
 
 void GameLayer::DrawConsolePanel() {
-  if (!ImGui::Begin("Console", &show_console_, ImGuiWindowFlags_NoCollapse)) {
+  if (!show_console_) return;
+  if (!ImGui::Begin("Console", nullptr, ImGuiWindowFlags_NoCollapse)) {
     ImGui::End();
     return;
   }
