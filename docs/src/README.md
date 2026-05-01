@@ -29,7 +29,6 @@ docs/
   ```markdown
   ---
   source: ref-balatro/<file>:<line-range>
-  last reviewed: YYYY-MM-DD
   ---
   ```
 - 单篇 ≤300 行，超了就拆。
