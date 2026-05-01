@@ -70,7 +70,7 @@ void GameLayer::EnsureTarget(int w, int h) {
 
 void GameLayer::DrawScene() {
   BeginTextureMode(target_);
-  ClearBackground(Color{30, 30, 46, 255});
+  ClearBackground(background_color_);
 
   // Reference grid so resizes are visible.
   for (int x = 0; x < target_w_; x += 32) {

@@ -24,6 +24,10 @@ class GameLayer : public Layer {
   bool* ShowConsolePtr() { return &show_console_; }
   bool* ViewportNoTitleBarPtr() { return &viewport_no_titlebar_; }
 
+  // Push the active scene background color (typically the ImGui theme's
+  // background, sourced by Game::Render). Cheap to call every frame.
+  void SetBackgroundColor(Color c) { background_color_ = c; }
+
  private:
   void EnsureTarget(int w, int h);
   void DrawScene();
@@ -43,6 +47,7 @@ class GameLayer : public Layer {
 
   // Demo scene state — replace with real game state.
   float time_ = 0.0f;
+  Color background_color_{30, 30, 46, 255};  // overridden per-frame by Game
   engine::Movable demo_;
   int demo_slot_ = 1;  // 1/2/3 keys map to T.x at 1/4, 1/2, 3/4 of viewport
 };

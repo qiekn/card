@@ -78,6 +78,7 @@ void Game::Init() {
   auto game_layer = std::make_unique<GameLayer>();
 
   imgui_layer_ = imgui_layer.get();
+  game_layer_ = game_layer.get();
 
   imgui_layer_->BindGamePanelToggles(game_layer->ShowViewportPtr(),
                                      game_layer->ShowHierarchyPtr(),
@@ -131,6 +132,10 @@ void Game::ToggleBorderless() {
 }
 
 void Game::Render() {
+  // Sync the scene background to the active ImGui theme so the RT inside
+  // the Viewport panel matches the surrounding chrome.
+  game_layer_->SetBackgroundColor(imgui_layer_->BackgroundColor());
+
   BeginDrawing();
   ClearBackground(imgui_layer_->BackgroundColor());
 
