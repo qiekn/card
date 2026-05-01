@@ -98,12 +98,49 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 
 ## Phase 5 — CardArea + 手牌弧形
 
-- [ ] `src/game/card.h/.cpp` (Card 字段框架)
-- [ ] `src/game/cardarea.h/.cpp`，type "hand" / "play" 公式
-- [ ] 8 张卡弧形排列 demo，加/减卡平滑重排
+- [x] `src/game/card.h/.cpp` (Card 字段框架)
+- [x] `src/game/cardarea.h/.cpp`，type "hand" / "play" 公式
+- [x] 8 张卡弧形排列 demo，加/减卡平滑重排
+- [x] `engine::AtlasRegistry`（by-name lookup + 跨 tier reload pointer-stable）
 
 ### 经验教训
-_(待填)_
+
+- **不存 slot 数组、每帧算公式**：第一感是 `array<Vector2, 8>` 存
+  死槽位，但 n 变了所有槽位定义都跟着变，状态翻倍。lua 的解法直接
+  跑一个 lerp 出 (x, y, r) 写到 `card.T`——Movable ease 自然把 VT
+  拉过去，**插值是免费的**。这是 Phase 3 那套 T/VT 分离的真红利：
+  排版逻辑可以是纯函数，每帧重算不存中间态。
+- **y-bow 公式从 game-unit 翻 pixel-unit 的判断点**：lua 的
+  `+ abs - 0.2` 在 G.TILESIZE=32 下整段 y bow 范围 ~0.19 game unit
+  ≈ 3 px——肉眼几乎看不见，扇形主要靠旋转。我们 T 直接是像素，照
+  抄就 3 px 弧高扁得没扇形味。`bow * card_h * 0.4` 是有意识的放大
+  ——是常数 taste 改造，不是 verbatim port。Caveats 里记下来，将
+  来真接了 G.TILESCALE 那一层再回头核对。
+- **spawn-from-right 比 (0,0) 自然**：新加的卡构造在 `(0, 0, w, h)`
+  时，VT 从 viewport 左上角起 ease 几百像素，肉眼上是慢吞吞从左上
+  飞下来。改 spawn 落在 hand 右边缘，等于"从 deck 发牌"的视觉
+  ——距离短、方向对、不需要动 ease 常数。
+- **HardSetCards 解决"启动全飞一遍"**：初始 5 张卡 emplace 后调
+  一次 `HardSetCards(0)` 直接 snap 到 slot——开场 = 已发完的状态。
+  没这一步的话开场会看到 5 张卡同时从右边滑入，跟"已经在玩"的语
+  境矛盾。lua 的 `hard_set_cards` 也是干这个用的。
+- **`temp_limit` 的居中收缩效果**：n < temp_limit 时 lerp 公式里
+  的 `-0.5*(n-M)/(M-1)` 修正项把整组居中，cards 从两端往中间收。
+  要是没这一项，减卡时剩下的全往左堆——丑，且与 lua 行为不符。
+- **CardArea 暂不继承 Movable**：MVP 内 area 自己不动（不会缩、
+  不会 juice），少一层。Phase 6+ 真要"area 抖一下"再 promote
+  ——promote 时 `x_/y_/w_/h_` 退化成 `T()` 的别名包装，不会动
+  AlignCards 公式本身。
+- **`std::vector<unique_ptr<Card>>` 自有 vs 全局池**：lua 把
+  cards 放全局 `G.I.CARD`，CardArea 持非拥有引用（因为卡可以从
+  deck 转 hand 转 play）。MVP 没跨 area 转移，自有更简单。`RemoveBack()`
+  返 `unique_ptr` 就是给"将来转 area"留的接口——挪到目标 area
+  Emplace 即可，不需要重写所有权。
+- **AtlasRegistry pointer stability 靠 unordered_map node 不动**：
+  reload 用 `it->second = std::move(new_atlas)` 不 `clear()`，
+  unordered_map 的 node 是堆上独立分配，rehash 也只动桶不动 node
+  地址——`Sprite` / `Card` 持的 `const Atlas*` 跨 tier 切换仍然
+  有效。要换成 `flat_hash_map` 这条不成立，得改设计。
 
 ## Phase 6 — 一轮玩法循环
 
