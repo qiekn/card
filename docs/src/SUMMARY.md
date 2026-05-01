@@ -26,6 +26,7 @@
 - [Build System](./project/build-system.md)
 - [Transform](./project/transform.md)
 - [Movable](./project/movable.md)
+- [Sprite](./project/sprite.md)
 
 ---
 
