@@ -1,5 +1,8 @@
 # Notes & design docs
 
+> **声明**：本站笔记由 LLM 协助阅读 `ref-balatro` 源码后生成。
+> 我自己的（人类）笔记在 <https://qiekn.notion.site/balatro>。
+
 `docs/` 是这个项目的「第二份事实来源」。代码说"现在是怎么实现的"；这里的笔记说"为什么这样实现 + Balatro 原版怎么做的"。
 
 ## 目录
