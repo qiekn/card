@@ -9,6 +9,7 @@
 - [Sprite / Shader](./balatro/03-sprite-shader.md)
 - [Particles](./balatro/04-particles.md)
 - [UI System](./balatro/05-ui-system.md)
+- [Draw Pipeline](./balatro/06-draw-pipeline.md)
 
 # 架构决策
 

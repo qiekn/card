@@ -13,7 +13,7 @@
 - [x] `balatro/03-sprite-shader.md`
 - [x] `balatro/04-particles.md`
 - [x] `balatro/05-ui-system.md`
-- [ ] `balatro/06-draw-pipeline.md`
+- [x] `balatro/06-draw-pipeline.md`
 - [ ] `architecture/port-decisions.md`
 - [ ] `architecture/ecs-vs-oo.md`
 - [ ] `architecture/shader-uniforms.md`
