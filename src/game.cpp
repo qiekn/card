@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <memory>
 
+#include "engine/text.h"
 #include "game_layer.h"
 
 namespace {
@@ -67,6 +68,11 @@ void Game::Init() {
   SetWindowIconFromPng("assets/icons/favicon.png");
   SetTargetFPS(kTargetFps);
   InitAudioDevice();
+
+  // Pre-load OpenSans atlases so HUD text uses the same face as ImGui.
+  // ASCII-only for now — switch to AsciiPlusCJK once we ship localized
+  // strings (see engine/text.h).
+  engine::LoadFonts(engine::CodepointSet::AsciiOnly);
 
   auto imgui_layer = std::make_unique<ImGuiLayer>();
   auto game_layer = std::make_unique<GameLayer>();
@@ -148,6 +154,7 @@ void Game::Shutdown() {
   if (borderless_) ToggleBorderless();
   SaveWindowState();
   layers_.clear();  // detach layers before the GL context goes away
+  engine::UnloadFonts();  // free font atlases (still need GL context)
   CloseAudioDevice();
   CloseWindow();
 }
