@@ -5,7 +5,7 @@
 #include <raylib.h>
 
 #include "engine/atlas_registry.h"
-#include "engine/sprite.h"
+#include "game/cardarea.h"
 #include "layer.h"
 
 // Owns the offscreen RenderTexture2D the game scene draws into, then displays
@@ -70,6 +70,8 @@ class GameLayer : public Layer {
   // is in-place (move-assign into existing slots), so the borrowed
   // Atlas* in `demo_` stays valid across the Themes panel combo flips.
   engine::AtlasRegistry atlases_;
-  std::optional<engine::Sprite> demo_;
-  int demo_slot_ = 1;  // 1/2/3 keys map to T.x at 1/4, 1/2, 3/4 of viewport
+  // Phase 5 hand demo. std::optional because CardArea isn't default-
+  // constructible (it needs viewport dims) and we build it in OnAttach.
+  std::optional<game::CardArea> hand_;
+  int next_sprite_idx_ = 0;  // walks through Joker atlas as cards are added
 };

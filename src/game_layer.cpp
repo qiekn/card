@@ -1,8 +1,44 @@
 #include "game_layer.h"
 
+#include <memory>
+
 #include <imgui.h>
 
 #include "engine/text.h"
+#include "game/card.h"
+
+namespace {
+// Display size of one card. 71×95 is the 1x atlas baseline; ×4 lands on
+// 284×380, matching the Phase 4 single-card demo and reading well even
+// on a 4K viewport (cards visibly overlap to form a fan).
+constexpr float kCardW = 71.0f * 4.0f;
+constexpr float kCardH = 95.0f * 4.0f;
+
+constexpr int kHandSoftCap = 10;        // user-side N-key cap
+constexpr int kHandTempLimit = 8;       // CardArea slot reservation
+
+// Hand area pixel rect, computed against the current RT size. Cards spawn
+// at the right edge of this rect so new cards "deal" from the right rather
+// than flying in from the viewport corner.
+struct HandLayout { float x, y, w, h; };
+HandLayout ComputeHandLayout(int target_w, int target_h) {
+  // 0.6 keeps a generous fan overlap on 1080p viewports and still leaves
+  // breathing room on 4K. No upper cap — let the hand grow with the panel.
+  const float w = static_cast<float>(target_w) * 0.6f;
+  const float x = (static_cast<float>(target_w) - w) * 0.5f;
+  const float y = static_cast<float>(target_h) - kCardH - 80.0f;
+  return {x, y, w, kCardH};
+}
+
+std::unique_ptr<game::Card> MakeJokerCard(const engine::Atlas& atlas, int idx,
+                                          float spawn_x, float spawn_y) {
+  // Walk through the Joker atlas grid (10 cols × 5 rows in 1x baseline).
+  const int col = idx % 10;
+  const int row = (idx / 10) % 5;
+  return std::make_unique<game::Card>(spawn_x, spawn_y, kCardW, kCardH, atlas,
+                                      col, row);
+}
+}  // namespace
 
 GameLayer::GameLayer() : Layer("GameLayer") {}
 
@@ -17,17 +53,23 @@ void GameLayer::OnAttach() {
     applied_texture_scale_ = texture_scale_;
   }
 
-  // Sprite demo: vanilla Joker (sprite_pos {0,0}) at 4x the 1x baseline =
-  // 284x380 px on screen. Atlas resolution and display size are
-  // independent — bigger atlas cell only means more source detail per dst
-  // pixel; it doesn't change how big the card lands in the viewport.
-  constexpr float kCardW = 71.0f * 4.0f;
-  constexpr float kCardH = 95.0f * 4.0f;
-  const float center_x = static_cast<float>(target_w_) * 0.5f - kCardW * 0.5f;
-  const float center_y = static_cast<float>(target_h_) * 0.5f - kCardH * 0.5f;
+  // Build the hand area at the bottom of the (initial) viewport. SetBounds
+  // refreshes this every frame in OnUpdate so a viewport resize keeps the
+  // hand pinned to the bottom-center.
+  const HandLayout init = ComputeHandLayout(target_w_, target_h_);
+  hand_.emplace(init.x, init.y, init.w, init.h, game::CardAreaType::Hand,
+                kCardW, kHandTempLimit);
+
   if (const engine::Atlas* joker = atlases_.Find("Joker")) {
-    demo_.emplace(center_x, center_y, kCardW, kCardH, *joker,
-                  /*sprite_x=*/0, /*sprite_y=*/0);
+    const float spawn_x = init.x + init.w;  // right edge of hand area
+    const float spawn_y = init.y;
+    for (int i = 0; i < 5; ++i) {
+      hand_->Emplace(MakeJokerCard(*joker, next_sprite_idx_++, spawn_x, spawn_y));
+    }
+    // Snap initial cards into their slots — without this they'd all visibly
+    // fly in from spawn_x/y on the very first frame, which feels wrong for
+    // a "scene loaded with a hand already dealt" state.
+    hand_->HardSetCards(0.0f);
   }
 }
 
@@ -36,7 +78,7 @@ void GameLayer::OnDetach() {
     UnloadRenderTexture(target_);
     target_valid_ = false;
   }
-  demo_.reset();
+  hand_.reset();
 }
 
 void GameLayer::OnUpdate(float dt) {
@@ -44,9 +86,9 @@ void GameLayer::OnUpdate(float dt) {
 
   // Themes panel may have flipped the tier — try to apply. On miss we
   // revert the UI value so the combo never lies about what's loaded.
-  // Registry reload is in-place move-assign, so the Sprite's non-owning
-  // Atlas pointer stays valid; the only side-effect is its src rect gets
-  // bigger / smaller at draw time via CellPx/Py.
+  // Registry reload is in-place move-assign, so each Card's borrowed
+  // Atlas pointer stays valid; the only side-effect is its src rect
+  // gets bigger / smaller at draw time via CellPx/Py.
   if (texture_scale_ != applied_texture_scale_) {
     if (atlases_.Load("assets/atlases.json", texture_scale_)) {
       applied_texture_scale_ = texture_scale_;
@@ -55,22 +97,33 @@ void GameLayer::OnUpdate(float dt) {
     }
   }
 
-  if (!demo_) return;
+  if (!hand_) return;
 
-  // Demo controls — 1/2/3 set T.x to 1/4, 1/2, 3/4 of viewport.
-  // VT.x exp-eases toward T.x via demo_->Move(dt) below.
-  const float w = demo_->T().w;
-  const float y = static_cast<float>(target_h_) * 0.5f - demo_->T().h * 0.5f;
-  const float vw = static_cast<float>(target_w_);
-  if (IsKeyPressed(KEY_ONE))   { demo_->T().x = vw * 0.25f - w * 0.5f; demo_slot_ = 1; }
-  if (IsKeyPressed(KEY_TWO))   { demo_->T().x = vw * 0.50f - w * 0.5f; demo_slot_ = 2; }
-  if (IsKeyPressed(KEY_THREE)) { demo_->T().x = vw * 0.75f - w * 0.5f; demo_slot_ = 3; }
-  // Re-anchor y in case the viewport was resized.
-  demo_->T().y = y;
+  // Re-anchor the hand to the bottom-center of the viewport so it follows
+  // panel resizes.
+  const HandLayout layout = ComputeHandLayout(target_w_, target_h_);
+  hand_->SetBounds(layout.x, layout.y, layout.w, layout.h);
 
-  if (IsKeyPressed(KEY_J)) demo_->JuiceUp(0.4f, 0.0f);
+  // N adds a card (capped at kHandSoftCap), M pops the rightmost. New
+  // cards spawn at the right edge of the hand area so they slide in from
+  // the right rather than flying in from (0,0).
+  if (IsKeyPressed(KEY_N) && hand_->Size() < kHandSoftCap) {
+    if (const engine::Atlas* joker = atlases_.Find("Joker")) {
+      const float spawn_x = layout.x + layout.w;
+      const float spawn_y = layout.y;
+      hand_->Emplace(MakeJokerCard(*joker, next_sprite_idx_++, spawn_x, spawn_y));
+    }
+  }
+  if (IsKeyPressed(KEY_M) && hand_->Size() > 0) {
+    hand_->RemoveBack();
+  }
+  // K juices a random card so the squash/stretch is visible mid-fan.
+  if (IsKeyPressed(KEY_K) && hand_->Size() > 0) {
+    const int idx = GetRandomValue(0, static_cast<int>(hand_->Size()) - 1);
+    hand_->At(static_cast<size_t>(idx))->JuiceUp(0.4f, 0.0f);
+  }
 
-  demo_->Move(dt);
+  hand_->Tick(dt, time_);
 }
 
 void GameLayer::OnRender() {
@@ -113,19 +166,18 @@ void GameLayer::DrawScene() {
     DrawLine(0, y, target_w_, y, kGridColor);
   }
 
-  // The Sprite demo: position+size from VT (eased), centered rotation,
-  // atlas slice picked at OnAttach.
-  if (demo_) demo_->Render();
+  // The Phase 5 hand demo: 5 jokers fanned at the bottom of the viewport.
+  // CardArea::Tick already wrote each card's T this frame; Render walks
+  // the slot list left-to-right (no z-order yet — Phase 6+ will need
+  // proper hover-lift z handling).
+  if (hand_) hand_->Render();
 
   engine::DrawTextBold(
-      TextFormat("Slot %d  (1/2/3 move, J juice)", demo_slot_),
+      TextFormat("Hand: %zu/%d   (N add, M remove, K juice random)",
+                 hand_ ? hand_->Size() : 0u, kHandSoftCap),
       Vector2{16, 16}, 18, RAYWHITE);
   engine::DrawText(
-      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s  atlas=%dx",
-                 demo_ ? demo_->T().x : 0.0f,
-                 demo_ ? demo_->VT().x : 0.0f,
-                 (demo_ && demo_->HasJuice()) ? "yes" : "no",
-                 texture_scale_),
+      TextFormat("atlas tier=%dx   real_time=%.1fs", texture_scale_, time_),
       Vector2{16, 44}, 18, Color{180, 180, 200, 255});
 
   EndTextureMode();

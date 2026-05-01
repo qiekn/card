@@ -66,6 +66,8 @@ add_executable(${PROJECT_NAME}
   src/engine/movable.cpp
   src/engine/sprite.cpp
   src/engine/text.cpp
+  src/game/card.cpp
+  src/game/cardarea.cpp
   src/game.cpp
   src/game_layer.cpp
   src/imgui_layer.cpp
