@@ -6,15 +6,8 @@
 
 namespace game {
 
-CardArea::CardArea(float x, float y, float w, float h, CardAreaType type,
-                   float card_w, int temp_limit)
-    : x_(x),
-      y_(y),
-      w_(w),
-      h_(h),
-      type_(type),
-      card_w_(card_w),
-      temp_limit_(temp_limit) {}
+CardArea::CardArea(float x, float y, float w, float h, CardAreaType type, float card_w, int temp_limit)
+    : x_(x), y_(y), w_(w), h_(h), type_(type), card_w_(card_w), temp_limit_(temp_limit) {}
 
 Card* CardArea::Emplace(std::unique_ptr<Card> card) {
   Card* raw = card.get();
@@ -72,17 +65,14 @@ void CardArea::AlignCards(float t) {
     // 787-810). The `(n - M)` correction centers the n cards inside the
     // area when n < temp_limit, so a shrinking hand collapses inward
     // instead of all hugging the left.
-    const float lerp_x =
-        (kf - 1.0f) / Mm1 - 0.5f * (nf - static_cast<float>(M)) / Mm1;
-    const float slot_x =
-        x_ + (w_ - card_w_) * lerp_x + 0.5f * (card_w_ - c->T().w);
+    const float lerp_x = (kf - 1.0f) / Mm1 - 0.5f * (nf - static_cast<float>(M)) / Mm1;
+    const float slot_x = x_ + (w_ - card_w_) * lerp_x + 0.5f * (card_w_ - c->T().w);
 
     if (type_ == CardAreaType::Hand) {
       // Rotation arc: end cards lean ±0.1 rad outward (0.2 / 2). The sin
       // term uses card.T.x as phase so each card wobbles independently
       // — without it every card would tilt in lockstep and look fake.
-      c->T().r = 0.2f * (-nf * 0.5f - 0.5f + kf) / nf +
-                 0.02f * std::sin(2.0f * t + c->T().x);
+      c->T().r = 0.2f * (-nf * 0.5f - 0.5f + kf) / nf + 0.02f * std::sin(2.0f * t + c->T().x);
       c->T().x = slot_x;
 
       // Vertical bow: |0..0.25| from end to center, doubled to give the
@@ -90,10 +80,8 @@ void CardArea::AlignCards(float t) {
       // is in game units; we lift it into pixel space by * card_h. The
       // sign on `bow` and the constant offset are tuned to keep the area
       // rect as the visual baseline (top of cards aligns with y_).
-      const float bow =
-          std::fabs(0.5f * (-nf * 0.5f + kf - 0.5f) / nf);  // 0..0.25
-      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f -
-                 bow * c->T().h * 0.4f +
+      const float bow = std::fabs(0.5f * (-nf * 0.5f + kf - 0.5f) / nf);  // 0..0.25
+      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - bow * c->T().h * 0.4f +
                  0.03f * c->T().h * std::sin(0.666f * t + c->T().x);
     } else {
       // Play: flat row, no rotation, no wobble.

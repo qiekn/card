@@ -14,8 +14,7 @@ bool AtlasRegistry::Load(const char* manifest_path, int tier) {
 
   const std::filesystem::path manifest{manifest_path};
   if (!std::filesystem::exists(manifest)) {
-    std::fprintf(stderr, "[atlas-registry] manifest not found: %s\n",
-                 manifest_path);
+    std::fprintf(stderr, "[atlas-registry] manifest not found: %s\n", manifest_path);
     return false;
   }
 
@@ -24,15 +23,12 @@ bool AtlasRegistry::Load(const char* manifest_path, int tier) {
     std::ifstream in(manifest);
     in >> root;
   } catch (...) {
-    std::fprintf(stderr, "[atlas-registry] manifest parse error: %s\n",
-                 manifest_path);
+    std::fprintf(stderr, "[atlas-registry] manifest parse error: %s\n", manifest_path);
     return false;
   }
 
   if (!root.is_array()) {
-    std::fprintf(stderr,
-                 "[atlas-registry] manifest must be a JSON array: %s\n",
-                 manifest_path);
+    std::fprintf(stderr, "[atlas-registry] manifest must be a JSON array: %s\n", manifest_path);
     return false;
   }
 
@@ -54,8 +50,7 @@ bool AtlasRegistry::Load(const char* manifest_path, int tier) {
     const int py = py_it->get<int>() * tier;
 
     char full[256];
-    std::snprintf(full, sizeof(full), "assets/textures/%dx/%s", tier,
-                  path.c_str());
+    std::snprintf(full, sizeof(full), "assets/textures/%dx/%s", tier, path.c_str());
 
     Atlas next{full, px, py};
     const bool ok = next.Loaded();
@@ -74,8 +69,7 @@ bool AtlasRegistry::Load(const char* manifest_path, int tier) {
 
   if (loaded_ok == 0) {
     std::fprintf(stderr,
-                 "[atlas-registry] no atlases loaded for %dx — wrong tier "
-                 "or missing assets/textures/%dx/?\n",
+                 "[atlas-registry] no atlases loaded for %dx — wrong tier or missing assets/textures/%dx/?\n",
                  tier, tier);
     return false;
   }

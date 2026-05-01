@@ -30,13 +30,11 @@ HandLayout ComputeHandLayout(int target_w, int target_h) {
   return {x, y, w, kCardH};
 }
 
-std::unique_ptr<game::Card> MakeJokerCard(const engine::Atlas& atlas, int idx,
-                                          float spawn_x, float spawn_y) {
+std::unique_ptr<game::Card> MakeJokerCard(const engine::Atlas& atlas, int idx, float spawn_x, float spawn_y) {
   // Walk through the Joker atlas grid (10 cols × 5 rows in 1x baseline).
   const int col = idx % 10;
   const int row = (idx / 10) % 5;
-  return std::make_unique<game::Card>(spawn_x, spawn_y, kCardW, kCardH, atlas,
-                                      col, row);
+  return std::make_unique<game::Card>(spawn_x, spawn_y, kCardW, kCardH, atlas, col, row);
 }
 }  // namespace
 
@@ -57,8 +55,7 @@ void GameLayer::OnAttach() {
   // refreshes this every frame in OnUpdate so a viewport resize keeps the
   // hand pinned to the bottom-center.
   const HandLayout init = ComputeHandLayout(target_w_, target_h_);
-  hand_.emplace(init.x, init.y, init.w, init.h, game::CardAreaType::Hand,
-                kCardW, kHandTempLimit);
+  hand_.emplace(init.x, init.y, init.w, init.h, game::CardAreaType::Hand, kCardW, kHandTempLimit);
 
   if (const engine::Atlas* joker = atlases_.Find("Joker")) {
     const float spawn_x = init.x + init.w;  // right edge of hand area
@@ -172,13 +169,11 @@ void GameLayer::DrawScene() {
   // proper hover-lift z handling).
   if (hand_) hand_->Render();
 
-  engine::DrawTextBold(
-      TextFormat("Hand: %zu/%d   (N add, M remove, K juice random)",
-                 hand_ ? hand_->Size() : 0u, kHandSoftCap),
-      Vector2{16, 16}, 18, RAYWHITE);
-  engine::DrawText(
-      TextFormat("atlas tier=%dx   real_time=%.1fs", texture_scale_, time_),
-      Vector2{16, 44}, 18, Color{180, 180, 200, 255});
+  engine::DrawTextBold(TextFormat("Hand: %zu/%d   (N add, M remove, K juice random)",
+                                  hand_ ? hand_->Size() : 0u, kHandSoftCap),
+                       Vector2{16, 16}, 18, RAYWHITE);
+  engine::DrawText(TextFormat("atlas tier=%dx   real_time=%.1fs", texture_scale_, time_),
+                   Vector2{16, 44}, 18, Color{180, 180, 200, 255});
 
   EndTextureMode();
 }
