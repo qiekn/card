@@ -15,7 +15,7 @@
 - [x] `balatro/05-ui-system.md`
 - [x] `balatro/06-draw-pipeline.md`
 - [x] `architecture/port-decisions.md`
-- [ ] `architecture/ecs-vs-oo.md`
+- [x] `architecture/ecs-vs-oo.md`
 - [ ] `architecture/shader-uniforms.md`
 - [ ] `architecture/hud-rendering.md`
 - [ ] `architecture/asset-pipeline.md`
