@@ -32,6 +32,10 @@ class ImGuiLayer : public Layer {
   // null to opt out of any individual entry.
   void BindGamePanelToggles(bool* viewport, bool* hierarchy, bool* console, bool* viewport_no_titlebar);
 
+  // Wires the Themes panel's "Texture Scale" combo to GameLayer's
+  // texture_scale_ member. Pass null to hide the combo.
+  void BindTextureScale(int* texture_scale) { texture_scale_ = texture_scale; }
+
  private:
   struct ColorValue {
     float r = 0.0f;
@@ -79,6 +83,9 @@ class ImGuiLayer : public Layer {
   bool* show_hierarchy_ = nullptr;
   bool* show_console_ = nullptr;
   bool* viewport_no_titlebar_ = nullptr;
+
+  // Driven by the Themes panel's combo. Non-owning. Null = hide combo.
+  int* texture_scale_ = nullptr;
 
   int selected_theme_ = 0;
   std::vector<Theme> themes_;

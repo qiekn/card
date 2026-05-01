@@ -1,5 +1,7 @@
 #include "game_layer.h"
 
+#include <cstdio>
+
 #include <imgui.h>
 
 #include "engine/text.h"
@@ -13,21 +15,20 @@ void GameLayer::OnAttach() {
   // before the Viewport panel reports its real size.
   EnsureTarget(1280, 720);
 
-  // Load the Joker atlas. 71x95 per cell — Balatro's universal card size.
-  // Path is relative to CWD (project root in dev), same convention as the
-  // text module's font paths.
-  joker_atlas_ = engine::Atlas{"assets/balatro/textures/1x/Jokers.png", 71, 95};
+  if (TryLoadJokerAtlas(texture_scale_)) {
+    applied_texture_scale_ = texture_scale_;
+  }
 
-  // Sprite demo: the vanilla Joker (sprite_pos {0,0}) at 4x cell size so it
-  // reads at typical viewport sizes. T.x set instantly by 1/2/3 keys; VT.x
-  // exp-eases each frame via Movable::Move.
-  constexpr float kCardScale = 4.0f;
-  const float w = 71.0f * kCardScale;
-  const float h = 95.0f * kCardScale;
-  const float center_x = static_cast<float>(target_w_) * 0.5f - w * 0.5f;
-  const float center_y = static_cast<float>(target_h_) * 0.5f - h * 0.5f;
-  demo_.emplace(center_x, center_y, w, h, joker_atlas_, /*sprite_x=*/0,
-                /*sprite_y=*/0);
+  // Sprite demo: vanilla Joker (sprite_pos {0,0}) at 4x the 1x baseline =
+  // 284x380 px on screen. Atlas resolution and display size are
+  // independent — bigger atlas cell only means more source detail per dst
+  // pixel; it doesn't change how big the card lands in the viewport.
+  constexpr float kCardW = 71.0f * 4.0f;
+  constexpr float kCardH = 95.0f * 4.0f;
+  const float center_x = static_cast<float>(target_w_) * 0.5f - kCardW * 0.5f;
+  const float center_y = static_cast<float>(target_h_) * 0.5f - kCardH * 0.5f;
+  demo_.emplace(center_x, center_y, kCardW, kCardH, joker_atlas_,
+                /*sprite_x=*/0, /*sprite_y=*/0);
 }
 
 void GameLayer::OnDetach() {
@@ -39,8 +40,31 @@ void GameLayer::OnDetach() {
   joker_atlas_ = {};
 }
 
+bool GameLayer::TryLoadJokerAtlas(int tier) {
+  char path[128];
+  std::snprintf(path, sizeof(path),
+                "assets/textures/%dx/Jokers.png", tier);
+  engine::Atlas next{path, 71 * tier, 95 * tier};
+  if (!next.Loaded()) return false;
+  joker_atlas_ = std::move(next);
+  return true;
+}
+
 void GameLayer::OnUpdate(float dt) {
   time_ += dt;
+
+  // Themes panel may have flipped the tier — try to apply. On miss we
+  // revert the UI value so the combo never lies about what's loaded.
+  // Atlas reload is move-assignment into the same member, so the Sprite's
+  // non-owning pointer stays valid; the only side-effect on Sprite is its
+  // src rect gets bigger / smaller at draw time via CellPx/Py.
+  if (texture_scale_ != applied_texture_scale_) {
+    if (TryLoadJokerAtlas(texture_scale_)) {
+      applied_texture_scale_ = texture_scale_;
+    } else {
+      texture_scale_ = applied_texture_scale_;
+    }
+  }
 
   if (!demo_) return;
 
@@ -104,12 +128,15 @@ void GameLayer::DrawScene() {
   // atlas slice picked at OnAttach.
   if (demo_) demo_->Render();
 
-  engine::DrawTextBold(TextFormat("Slot %d  (1/2/3 to move, J to juice)", demo_slot_), Vector2{16, 16}, 18, RAYWHITE);
+  engine::DrawTextBold(
+      TextFormat("Slot %d  (1/2/3 move, J juice)", demo_slot_),
+      Vector2{16, 16}, 18, RAYWHITE);
   engine::DrawText(
-      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s",
+      TextFormat("T.x=%.1f  VT.x=%.1f  juice=%s  atlas=%dx",
                  demo_ ? demo_->T().x : 0.0f,
                  demo_ ? demo_->VT().x : 0.0f,
-                 (demo_ && demo_->HasJuice()) ? "yes" : "no"),
+                 (demo_ && demo_->HasJuice()) ? "yes" : "no",
+                 texture_scale_),
       Vector2{16, 44}, 18, Color{180, 180, 200, 255});
 
   EndTextureMode();

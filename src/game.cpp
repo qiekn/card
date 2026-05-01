@@ -17,24 +17,32 @@ struct WindowState {
   int y;
   int w;
   int h;
+  int texture_scale;
 };
 
 WindowState LoadWindowState(int default_w, int default_h) {
-  WindowState s{80, 80, default_w, default_h};
+  WindowState s{80, 80, default_w, default_h, 2};
   if (FILE* f = std::fopen(kWindowStateFile, "r")) {
-    int x, y, w, h;
-    if (std::fscanf(f, "%d %d %d %d", &x, &y, &w, &h) == 4 && w > 0 && h > 0) {
-      s = {x, y, w, h};
+    int x, y, w, h, ts;
+    // Try the 5-field format first; fall back to legacy 4-field so older
+    // window.state files parse without losing window pos.
+    int n = std::fscanf(f, "%d %d %d %d %d", &x, &y, &w, &h, &ts);
+    if (n >= 4 && w > 0 && h > 0) {
+      s.x = x; s.y = y; s.w = w; s.h = h;
+    }
+    if (n == 5 && (ts == 1 || ts == 2)) {
+      s.texture_scale = ts;
     }
     std::fclose(f);
   }
   return s;
 }
 
-void SaveWindowState() {
+void SaveWindowState(int texture_scale) {
   Vector2 pos = GetWindowPosition();
   if (FILE* f = std::fopen(kWindowStateFile, "w")) {
-    std::fprintf(f, "%d %d %d %d\n", (int)pos.x, (int)pos.y, GetScreenWidth(), GetScreenHeight());
+    std::fprintf(f, "%d %d %d %d %d\n", (int)pos.x, (int)pos.y,
+                 GetScreenWidth(), GetScreenHeight(), texture_scale);
     std::fclose(f);
   }
 }
@@ -80,10 +88,15 @@ void Game::Init() {
   imgui_layer_ = imgui_layer.get();
   game_layer_ = game_layer.get();
 
+  // Restore the persisted tier before push_layer fires GameLayer::OnAttach,
+  // so the very first atlas load picks the right dir (no init flicker).
+  *game_layer->TextureScalePtr() = state.texture_scale;
+
   imgui_layer_->BindGamePanelToggles(game_layer->ShowViewportPtr(),
                                      game_layer->ShowHierarchyPtr(),
                                      game_layer->ShowConsolePtr(),
                                      game_layer->ViewportNoTitleBarPtr());
+  imgui_layer_->BindTextureScale(game_layer->TextureScalePtr());
 
   // Order matters: ImGuiLayer must submit DockSpaceOverViewport before
   // GameLayer's Viewport window so the panel can dock into the central node
@@ -157,7 +170,7 @@ void Game::Render() {
 
 void Game::Shutdown() {
   if (borderless_) ToggleBorderless();
-  SaveWindowState();
+  SaveWindowState(*game_layer_->TextureScalePtr());
   layers_.clear();  // detach layers before the GL context goes away
   engine::UnloadFonts();  // free font atlases (still need GL context)
   CloseAudioDevice();

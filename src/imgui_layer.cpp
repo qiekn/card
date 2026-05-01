@@ -211,6 +211,20 @@ void ImGuiLayer::DrawThemesPanel() {
 
   ImGui::Separator();
   ImGui::ColorEdit4("Background Color", background_color_.data());
+  if (texture_scale_ != nullptr) {
+    ImGui::Separator();
+    // 1x and 2x are the tiers we ship; 4x is left out per design (file
+    // size, no perceptible quality bump on most displays). GameLayer
+    // reverts the value if the chosen dir is missing — no need to gate
+    // entries here.
+    constexpr int kTiers[] = {1, 2};
+    constexpr const char* kTierLabels[] = {"1x", "2x"};
+    int idx = (*texture_scale_ == 1) ? 0 : 1;
+    if (ImGui::Combo("Texture Scale", &idx, kTierLabels,
+                     IM_ARRAYSIZE(kTierLabels))) {
+      *texture_scale_ = kTiers[idx];
+    }
+  }
   ImGui::Separator();
   ImGui::Text("%.1f FPS (%.2f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
 
