@@ -39,7 +39,7 @@ struct MovableEase {
   float xy_gain = 35.0f;
   float max_vel_pps = 5000.0f;
   float pinch_speed = 8.0f;
-  float sway_coeff = 0.0005f;
+  float sway_coeff = 0.00015f;
 };
 
 struct HandLayout {
@@ -82,14 +82,16 @@ VT += v
 | **exp_kscale** | 60 | VT.scale 追 T.scale 的衰减率 | 影响 juice squash & stretch 的"反弹"节奏 |
 | **exp_kr** | 190 | VT.r 追 T.r 的衰减率 | 默认远高于 xy——卡的旋转要比位移先落地，看着才不软 |
 | **pinch_speed** | 8 | 翻牌动画恒速（不走 ease） (1/sec) | 越大翻得越快 |
-| **sway_coeff** | 0.0005 | 运动时附加旋转：VT.r += sway * vel.x / dt | 0.001+ 卡就打转；0 = 完全不侧倾 |
+| **sway_coeff** | 0.00015 | 运动时附加旋转：VT.r += sway * vel.x / dt | 0.001+ 卡就打转；0 = 完全不侧倾 |
 
 `max_vel_pps` 是从 lua 的 70 game-unit/sec 重新校准过来的（lua 默认
 约等于 70 × 30 px = 2100 px/sec）。我们调到 5000 让 drag 释放更跟手，
 还在合理范围内。
 
-`sway_coeff` 同理，0.015 / 30 ≈ 0.0005。lua 的 game-unit 速度量级和
-我们 pixel 量级差 ~30 倍。
+`sway_coeff` 同理，0.015 / 30 ≈ 0.0005 是 game-unit→pixel 的换算
+起点；但 playtest 时卡按 4× baseline 显示（284 px 宽），视觉上对
+旋转的敏感度也放大 4×，所以再 / 4 落到 0.000125 附近。最终选
+0.00015。
 
 ## 4 · Hand layout 各参数
 
