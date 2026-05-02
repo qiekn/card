@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <memory>
 
+#include <imgui.h>
+
 #include "engine/text.h"
 #include "game_layer.h"
 
@@ -183,6 +185,13 @@ void Game::Render() {
     for (auto& layer : layers_) {
       layer->OnImGuiRender();
     }
+  } else {
+    // Hidden mode: OnImGuiRender (which normally hosts the hand mouse
+    // arbitration via DrawViewportPanel) is skipped. Route input here
+    // instead — the RT covers the full backbuffer, so ImGui's mouse pos
+    // is already in RT coords and the whole window counts as hovered.
+    const ImVec2 m = ImGui::GetMousePos();
+    game_layer_->ProcessHandInput(Vector2{m.x, m.y}, true);
   }
   imgui_layer_->End();
 

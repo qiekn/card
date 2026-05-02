@@ -177,6 +177,46 @@ void GameLayer::DrawScene() {
   EndTextureMode();
 }
 
+void GameLayer::ProcessHandInput(Vector2 mouse_rt, bool hovered) {
+  if (!hand_) return;
+
+  // Hand cursor on hover (only when not already dragging — dragging
+  // gets the system "grabbing" cursor implicitly via ImGui's drag).
+  if (hovered && !hand_->IsDragging() && hand_->FindHovered(mouse_rt)) {
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+  }
+
+  // Mouse-down inside the viewport picks the candidate card. The hovered
+  // gate excludes clicks on docked ImGui panels (visible mode); in hidden
+  // mode the caller passes hovered=true unconditionally.
+  if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    pressed_card_ = hand_->FindHovered(mouse_rt);
+    pressed_origin_rt_ = mouse_rt;
+  }
+
+  // While the mouse stays down on a candidate: promote to drag once
+  // ImGui's drag threshold is crossed, then forward cursor updates.
+  if (pressed_card_ != nullptr) {
+    if (!hand_->IsDragging() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+      hand_->StartDrag(pressed_card_, pressed_origin_rt_);
+    }
+    if (hand_->IsDragging()) {
+      hand_->UpdateDrag(mouse_rt);
+    }
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+      if (hand_->IsDragging()) {
+        hand_->StopDrag();
+      } else {
+        // Click without drag → toggle highlight. The lift animation
+        // (engine::tuning::hand.highlight_lift, eased through Movable)
+        // is the feedback; balatro's Card:click path doesn't juice_up.
+        pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
+      }
+      pressed_card_ = nullptr;
+    }
+  }
+}
+
 void GameLayer::DrawViewportPanel() {
   if (!show_viewport_) return;
 
@@ -223,43 +263,7 @@ void GameLayer::DrawViewportPanel() {
     const Vector2 mouse_rt{m.x - image_min.x, m.y - image_min.y};
     const bool image_hovered = ImGui::IsItemHovered();
 
-    if (hand_) {
-      // Hand cursor on hover (only when not already dragging — dragging
-      // gets the system "grabbing" cursor implicitly via ImGui's drag).
-      if (image_hovered && !hand_->IsDragging() && hand_->FindHovered(mouse_rt)) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-      }
-
-      // Mouse-down inside the image picks the candidate card. Outside
-      // clicks (menu bar, panels) are ignored because IsItemHovered
-      // gates this branch.
-      if (image_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        pressed_card_ = hand_->FindHovered(mouse_rt);
-        pressed_origin_rt_ = mouse_rt;
-      }
-
-      // While the mouse stays down on a candidate: promote to drag once
-      // ImGui's drag threshold is crossed, then forward cursor updates.
-      if (pressed_card_ != nullptr) {
-        if (!hand_->IsDragging() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-          hand_->StartDrag(pressed_card_, pressed_origin_rt_);
-        }
-        if (hand_->IsDragging()) {
-          hand_->UpdateDrag(mouse_rt);
-        }
-        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-          if (hand_->IsDragging()) {
-            hand_->StopDrag();
-          } else {
-            // Click without drag → toggle highlight. The lift animation
-            // (engine::tuning::hand.highlight_lift, eased through Movable)
-            // is the feedback; balatro's Card:click path doesn't juice_up.
-            pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
-          }
-          pressed_card_ = nullptr;
-        }
-      }
-    }
+    ProcessHandInput(mouse_rt, image_hovered);
   }
 
   // Right-click anywhere in the viewport for the toggle — essential when the

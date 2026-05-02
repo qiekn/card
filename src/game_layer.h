@@ -46,6 +46,12 @@ class GameLayer : public Layer {
   const RenderTexture2D& Target() const { return target_; }
   bool TargetValid() const { return target_valid_; }
 
+  // Hand mouse arbitration (hover / click vs drag / release). Visible
+  // mode calls it from DrawViewportPanel with ImGui's panel-relative
+  // mouse + IsItemHovered; hidden mode calls it from Game::Render with
+  // the raw ImGui mouse + hovered=true (RT covers the full backbuffer).
+  void ProcessHandInput(Vector2 mouse_rt, bool hovered);
+
  private:
   void EnsureTarget(int w, int h);
   void DrawScene();
