@@ -170,20 +170,36 @@ void Sprite::Render() {
 等 CardArea 真要用 game-unit（譬如 `card.T.w = 2.5` 表示 2.5 个 tile）
 再加。
 
-## 5 · POINT filter：为什么写死
+## 5 · BILINEAR filter：从 POINT 翻过来
 
-raylib 默认 `TEXTURE_FILTER_BILINEAR`。bilinear 对 photo / 3D 贴图
-合适——4 个邻居加权平均，平滑。但 Balatro 是 pixel art，1px 的卡牌
-描边会被糊成 2px 模糊带。
+最初这一节写的是"POINT 写死"——理由是 Balatro 是 pixel art、bilinear
+会把 1px 描边糊成 2px。Phase 5 接 hand 扇形 + drag 之后 4K 屏上发现
+旋转卡的边缘锯齿很明显：每张 hand 卡都有 ±0.1 rad 倾角，POINT 采样
+在卡边界两侧落整数 texel → 阶梯。
 
-`Atlas` ctor 一律 `SetTextureFilter(TEXTURE_FILTER_POINT)`，写死。
-没给构造参数让 caller 选——MVP 所有 atlas 都是 pixel art，没非 POINT
-的需求。要真有再加 enum 参数。
+权衡：
 
-注意叠加效应：viewport RT 也是 POINT（`game_layer.cpp` 早已设过），
-ImGui::Image 把 RT 缩放到面板尺寸时也走 POINT（raylib 不管这步）。
-**整条链 atlas POINT → RT POINT → ImGui scale POINT**，pixel art
-保真到屏幕。
+- **POINT**：整数 scale 下纹理 crisp，但旋转 / 非整数 scale 下边缘
+  阶梯化。1px 描边在 axis-aligned 时锐利，在 rotated 时锯齿。
+- **BILINEAR**：4 texel 加权混合。旋转 / 非整数 scale 下边缘平滑过渡。
+  非整数 scale 下纹理内容（数字 / 花色 pip）轻微软化。
+
+我们的场景：每张 hand 卡都旋转。pixel art 内容显示在 4× 放大尺寸
+（71→284 px），texture 软化在 4K 屏高 PPI 下肉眼几乎不见。结论：
+BILINEAR 收益大于损失。
+
+```cpp
+SetTextureFilter(texture_, TEXTURE_FILTER_BILINEAR);
+```
+
+写死，没给构造参数让 caller 选——所有 hand 卡都是 pixel art 但都旋
+转，统一 BILINEAR。要真有"完全 axis-aligned + 极小尺度需要 crisp
+1px 线"的需求（譬如 ui_assets atlas 画细 UI 边框）再加 enum 参数。
+
+注意叠加效应：viewport RT 仍是 POINT（`game_layer.cpp` 设过）——RT
+1:1 显示到 ImGui::Image 时不需要 filter；如果出现非整数 scale，RT
+也跟着改 BILINEAR。**整条链 atlas BILINEAR → RT POINT → ImGui scale
+nearest**，旋转锯齿在 atlas → RT 阶段就消除了。
 
 ## 6 · 接进 demo：viewport 中央放一张 Joker
 
