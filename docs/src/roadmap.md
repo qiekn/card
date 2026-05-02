@@ -102,6 +102,7 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 - [x] `src/game/cardarea.h/.cpp`，type "hand" / "play" 公式
 - [x] 8 张卡弧形排列 demo，加/减卡平滑重排
 - [x] `engine::AtlasRegistry`（by-name lookup + 跨 tier reload pointer-stable）
+- [x] hover/click highlight + 旋转矩形 hit-test（hover 换 cursor，click 切 highlighted lift +40 px + JuiceUp）
 
 ### 经验教训
 
@@ -141,6 +142,22 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
   unordered_map 的 node 是堆上独立分配，rehash 也只动桶不动 node
   地址——`Sprite` / `Card` 持的 `const Atlas*` 跨 tier 切换仍然
   有效。要换成 `flat_hash_map` 这条不成立，得改设计。
+- **ImGui FBO V flip 抵消鼠标 y**：`ImGui::Image` 用
+  `(ImVec2(0,1), ImVec2(1,0))` 翻转 raylib FBO 上下颠倒；这一步
+  之后**鼠标坐标不需要再翻 y**——raylib RT 用 top-left 原点、
+  ImGui 也用 top-left，flip 把两边的差互相抵消。`mouse_in_rt =
+  mouse_global - image_min` 不带 y 取负。第一版我多翻了一次结果
+  hit-test 全在卡的镜像位置上，调了几分钟才意识到。
+- **hit-test 必须用 VT，不是 T**：扇形旋转和 juice 缩放都写在 VT，
+  T 是目标值（接近静态）。lua 用 `CT = VT` 同步是出于一样的考虑
+  ——拖动中卡的视觉位置在 VT，命中也得在 VT，否则点击会落在卡的
+  "目标位置"而不是"现在你看到的位置"，偏几像素就感觉不对。
+- **输入门控走 ImGui::IsItemHovered 而非 raylib**：raylib
+  `IsMouseButtonPressed` 不知道菜单栏 / Themes 面板的存在，hand
+  会接到所有点击。ImGui 的 `IsItemHovered()` + `IsMouseClicked()`
+  跟 ImGui 的输入仲裁配合，菜单栏 / 面板上的 click 不会穿透。这
+  也意味着 input 必须挂在 OnImGuiRender 里、而不是 OnUpdate
+  ——多 1 帧延迟，肉眼无感。
 
 ## Phase 6 — 一轮玩法循环
 
