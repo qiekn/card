@@ -55,6 +55,7 @@ class ImGuiLayer : public Layer {
   void DrawMainMenuBar();
   void DrawInspectorPanel();
   void DrawThemesPanel();
+  void DrawSettingsPanel();
 
   // Submits DockSpaceOverViewport and (on first run, when no imgui.ini exists)
   // installs the default game-engine dock layout via the DockBuilder API.
@@ -75,6 +76,7 @@ class ImGuiLayer : public Layer {
   bool visible_ = true;
   bool show_inspector_ = true;
   bool show_themes_ = true;
+  bool show_settings_ = true;
   bool show_demo_ = false;
 
   bool needs_default_layout_ = false;

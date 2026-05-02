@@ -14,6 +14,8 @@
 #include <imgui_internal.h>
 #include <nlohmann/json.hpp>
 
+#include "engine/tuning.h"
+
 ImGuiLayer::ImGuiLayer() : Layer("ImGuiLayer") {}
 
 void ImGuiLayer::BindGamePanelToggles(bool* viewport, bool* hierarchy, bool* console, bool* viewport_no_titlebar) {
@@ -88,6 +90,7 @@ void ImGuiLayer::OnImGuiRender() {
 
   if (show_inspector_) DrawInspectorPanel();
   if (show_themes_) DrawThemesPanel();
+  if (show_settings_) DrawSettingsPanel();
 
   if (show_demo_) {
     ImGui::ShowDemoWindow(&show_demo_);
@@ -121,6 +124,7 @@ void ImGuiLayer::SetupDefaultLayout(unsigned int dockspace_id) {
   ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
   ImGui::DockBuilderDockWindow("Inspector", dock_right);
   ImGui::DockBuilderDockWindow("Themes", dock_right);
+  ImGui::DockBuilderDockWindow("Settings", dock_right);
   ImGui::DockBuilderDockWindow("Console", dock_bottom);
   ImGui::DockBuilderDockWindow("Viewport", dock_main);
 
@@ -144,6 +148,7 @@ void ImGuiLayer::DrawMainMenuBar() {
     ImGui::Separator();
     ImGui::MenuItem("Inspector", nullptr, &show_inspector_);
     ImGui::MenuItem("Themes", nullptr, &show_themes_);
+    ImGui::MenuItem("Settings", nullptr, &show_settings_);
     ImGui::Separator();
     if (viewport_no_titlebar_) {
       ImGui::MenuItem("Hide Viewport Title Bar", nullptr, viewport_no_titlebar_);
@@ -227,6 +232,41 @@ void ImGuiLayer::DrawThemesPanel() {
   }
   ImGui::Separator();
   ImGui::Text("%.1f FPS (%.2f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+
+  ImGui::End();
+}
+
+void ImGuiLayer::DrawSettingsPanel() {
+  if (!show_settings_) return;
+  if (!ImGui::Begin("Settings", &show_settings_, ImGuiWindowFlags_NoCollapse)) {
+    ImGui::End();
+    return;
+  }
+
+  ImGui::TextDisabled("Live tuning. Values are not persisted across runs.");
+  ImGui::Spacing();
+
+  if (ImGui::CollapsingHeader("Movable ease", ImGuiTreeNodeFlags_DefaultOpen)) {
+    auto& e = engine::tuning::ease;
+    ImGui::SliderFloat("xy damping (exp_kxy)", &e.exp_kxy, 1.0f, 500.0f, "%.1f");
+    ImGui::SliderFloat("xy gain", &e.xy_gain, 1.0f, 200.0f, "%.1f");
+    ImGui::SliderFloat("max velocity (px/sec)", &e.max_vel_pps, 100.0f, 20000.0f, "%.0f");
+    ImGui::SliderFloat("scale damping (exp_kscale)", &e.exp_kscale, 1.0f, 500.0f, "%.1f");
+    ImGui::SliderFloat("r damping (exp_kr)", &e.exp_kr, 1.0f, 1000.0f, "%.1f");
+    ImGui::SliderFloat("pinch speed", &e.pinch_speed, 1.0f, 50.0f, "%.2f");
+    ImGui::SliderFloat("sway coefficient", &e.sway_coeff, 0.0f, 0.1f, "%.4f");
+    if (ImGui::Button("Reset Ease")) engine::tuning::ResetEase();
+  }
+
+  if (ImGui::CollapsingHeader("Hand layout", ImGuiTreeNodeFlags_DefaultOpen)) {
+    auto& h = engine::tuning::hand;
+    ImGui::SliderFloat("width factor (× viewport)", &h.w_factor, 0.3f, 1.0f, "%.2f");
+    ImGui::SliderFloat("max width (px)", &h.max_w, 400.0f, 4000.0f, "%.0f");
+    ImGui::SliderFloat("y offset from bottom (px)", &h.y_offset, 0.0f, 400.0f, "%.0f");
+    ImGui::SliderFloat("y bow factor (× card_h)", &h.bow_factor, 0.0f, 1.5f, "%.2f");
+    ImGui::SliderFloat("highlight lift (px)", &h.highlight_lift, 0.0f, 120.0f, "%.0f");
+    if (ImGui::Button("Reset Hand")) engine::tuning::ResetHand();
+  }
 
   ImGui::End();
 }
