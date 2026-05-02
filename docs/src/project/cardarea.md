@@ -324,7 +324,6 @@ if (image_hovered && hand_) {
     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
       hit->SetHighlighted(!hit->Highlighted());
-      hit->JuiceUp(0.4f, 0.0f);
     }
   }
 }
@@ -470,7 +469,7 @@ void CardArea::Render() {
 |--|--|--|
 | 候选 | mouse-down 在卡上 | 记 `pressed_card_` + `pressed_origin_rt_` |
 | 升级到 drag | `IsMouseDragging(0)` 返回 true | StartDrag(候选, origin)，进入 drag 闭环 |
-| 释放 | `IsMouseReleased(0)` | dragging? StopDrag : 把候选当 click 处理（toggle highlight + JuiceUp）|
+| 释放 | `IsMouseReleased(0)` | dragging? StopDrag : 把候选当 click 处理（toggle highlight）|
 
 ```cpp
 if (image_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -490,13 +489,19 @@ if (pressed_card_ != nullptr) {
     if (hand_->IsDragging()) {
       hand_->StopDrag();
     } else {
-      pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
-      pressed_card_->JuiceUp(0.4f, 0.0f);
+      pressed_card_->SetHighlighted(
+          !pressed_card_->Highlighted());
     }
     pressed_card_ = nullptr;
   }
 }
 ```
+
+> 点击的视觉反馈走 `highlighted` 切换 → `tuning::hand.highlight_lift`
+> 上抬 40 px，由 Movable 的 exp ease 自然过渡。balatro 原版
+> `Card:click` 路径里 **没有** `juice_up`——拍扁回弹是给 set_edition /
+> set_seal / 出牌打分 这些"事件级"反馈用的，普通 click 留给 lift +
+> 音效。
 
 注意：进入 drag 后 ImGui 自动把 mouse 当作"按住状态"——即使光标
 离开了 viewport image，`IsMouseDragging` / `IsMouseReleased` 仍然

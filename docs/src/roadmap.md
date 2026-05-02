@@ -102,7 +102,7 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 - [x] `src/game/cardarea.h/.cpp`，type "hand" / "play" 公式
 - [x] 8 张卡弧形排列 demo，加/减卡平滑重排
 - [x] `engine::AtlasRegistry`（by-name lookup + 跨 tier reload pointer-stable）
-- [x] hover/click highlight + 旋转矩形 hit-test（hover 换 cursor，click 切 highlighted lift +40 px + JuiceUp）
+- [x] hover/click highlight + 旋转矩形 hit-test（hover 换 cursor，click 切 highlighted lift +40 px）
 - [x] drag-to-reorder（按住卡跟手 + 跨邻居 stable_sort by T.x → 邻居 ease 让位 + 释放回 slot）
 - [x] `engine::tuning` + ImGui Settings 面板（live tune ease/hand 常数，详见 `project/tuning.md`）
 

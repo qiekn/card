@@ -251,9 +251,10 @@ void GameLayer::DrawViewportPanel() {
           if (hand_->IsDragging()) {
             hand_->StopDrag();
           } else {
-            // Click without drag → toggle highlight + JuiceUp feedback.
+            // Click without drag → toggle highlight. The lift animation
+            // (engine::tuning::hand.highlight_lift, eased through Movable)
+            // is the feedback; balatro's Card:click path doesn't juice_up.
             pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
-            pressed_card_->JuiceUp(0.4f, 0.0f);
           }
           pressed_card_ = nullptr;
         }
