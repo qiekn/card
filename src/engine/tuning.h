@@ -25,9 +25,10 @@ struct MovableEase {
   float pinch_speed = 8.0f;     // mechanical pinch (flip animation)
   // Tilt-with-velocity coefficient (rad per unit vel.x). Lua's 0.015 was
   // in game-units; in our pixel-direct port one game-unit ≈ 30 px (a
-  // typical Balatro tile), so dividing by ~30 lands near 0.0005. Higher
-  // values make moving cards spin visibly.
-  float sway_coeff = 0.0005f;
+  // typical Balatro tile), so dividing by ~30 lands near 0.0005 — but
+  // playtesting at the real card display size (4× baseline = 284 px wide)
+  // showed even 0.0005 spins too aggressively, 0.00015 is the sweet spot.
+  float sway_coeff = 0.00015f;
 };
 
 struct HandLayout {
