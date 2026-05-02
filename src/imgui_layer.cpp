@@ -238,7 +238,7 @@ void ImGuiLayer::DrawThemesPanel() {
 
 void ImGuiLayer::DrawSettingsPanel() {
   if (!show_settings_) return;
-  if (!ImGui::Begin("Settings", &show_settings_, ImGuiWindowFlags_NoCollapse)) {
+  if (!ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoCollapse)) {
     ImGui::End();
     return;
   }
@@ -254,7 +254,7 @@ void ImGuiLayer::DrawSettingsPanel() {
     ImGui::SliderFloat("scale damping (exp_kscale)", &e.exp_kscale, 1.0f, 500.0f, "%.1f");
     ImGui::SliderFloat("r damping (exp_kr)", &e.exp_kr, 1.0f, 1000.0f, "%.1f");
     ImGui::SliderFloat("pinch speed", &e.pinch_speed, 1.0f, 50.0f, "%.2f");
-    ImGui::SliderFloat("sway coefficient", &e.sway_coeff, 0.0f, 0.1f, "%.4f");
+    ImGui::SliderFloat("sway coefficient", &e.sway_coeff, 0.0f, 0.005f, "%.5f");
     if (ImGui::Button("Reset Ease")) engine::tuning::ResetEase();
   }
 

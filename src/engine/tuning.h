@@ -23,7 +23,11 @@ struct MovableEase {
   // drag finishes in ~50 ms instead of ~2 s.
   float max_vel_pps = 5000.0f;
   float pinch_speed = 8.0f;     // mechanical pinch (flip animation)
-  float sway_coeff = 0.015f;    // side-sway amount (tilt per unit vel.x)
+  // Tilt-with-velocity coefficient (rad per unit vel.x). Lua's 0.015 was
+  // in game-units; in our pixel-direct port one game-unit ≈ 30 px (a
+  // typical Balatro tile), so dividing by ~30 lands near 0.0005. Higher
+  // values make moving cards spin visibly.
+  float sway_coeff = 0.0005f;
 };
 
 struct HandLayout {
