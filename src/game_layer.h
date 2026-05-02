@@ -38,6 +38,14 @@ class GameLayer : public Layer {
   // that's actually on the GPU.
   int* TextureScalePtr() { return &texture_scale_; }
 
+  // Exposed for Game::Render's "ImGui hidden = scene fullscreen" path.
+  // When the chrome is hidden we resize the RT to window size (so the
+  // blit is 1:1) and blit it directly to the backbuffer instead of
+  // routing through ImGui::Image.
+  void EnsureTargetSize(int w, int h) { EnsureTarget(w, h); }
+  const RenderTexture2D& Target() const { return target_; }
+  bool TargetValid() const { return target_valid_; }
+
  private:
   void EnsureTarget(int w, int h);
   void DrawScene();

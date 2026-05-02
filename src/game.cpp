@@ -149,16 +149,37 @@ void Game::Render() {
   // the Viewport panel matches the surrounding chrome.
   game_layer_->SetBackgroundColor(imgui_layer_->BackgroundColor());
 
+  // When ImGui is hidden the Viewport panel doesn't run — size the RT to
+  // the framebuffer so the fullscreen blit below is 1:1 in real pixels.
+  // GetScreenWidth/Height is logical (DPI-unscaled), GetRenderWidth/Height
+  // is the actual framebuffer; using the logical size on a HiDPI display
+  // would produce a smaller RT that then gets stretched by the blit.
+  const bool imgui_visible = imgui_layer_->IsVisible();
+  if (!imgui_visible) {
+    game_layer_->EnsureTargetSize(GetRenderWidth(), GetRenderHeight());
+  }
+
   BeginDrawing();
   ClearBackground(imgui_layer_->BackgroundColor());
 
   for (auto& layer : layers_) {
     layer->OnRender();
   }
+
+  // ImGui hidden: blit the scene RT straight to the backbuffer instead of
+  // routing through ImGui::Image. raylib FBOs are y-flipped relative to
+  // the backbuffer — negative src height un-flips on the way out.
+  if (!imgui_visible && game_layer_->TargetValid()) {
+    const RenderTexture2D& rt = game_layer_->Target();
+    const Rectangle src{0, 0, (float)rt.texture.width, -(float)rt.texture.height};
+    const Rectangle dst{0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()};
+    DrawTexturePro(rt.texture, src, dst, Vector2{0, 0}, 0.0f, WHITE);
+  }
+
   rlDrawRenderBatchActive();
 
   imgui_layer_->Begin();
-  if (imgui_layer_->IsVisible()) {
+  if (imgui_visible) {
     for (auto& layer : layers_) {
       layer->OnImGuiRender();
     }
