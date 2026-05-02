@@ -4,14 +4,11 @@
 #include <cmath>
 #include <utility>
 
+#include "engine/tuning.h"
+
 namespace game {
 
 namespace {
-// Lift applied to highlighted cards in the Hand area. lua uses
-// G.HIGHLIGHT_H (game units); we pick a flat pixel constant so the
-// effect is visible regardless of card_h.
-constexpr float kHandHighlightLift = 40.0f;
-
 bool HitRotatedRect(const engine::Transform& vt, Vector2 p) {
   // Translate p into the card's local frame (origin at center).
   const float cx = vt.x + vt.w * 0.5f;
@@ -158,8 +155,9 @@ void CardArea::AlignCards(float t) {
       const float bow = std::fabs(0.5f * (-nf * 0.5f + kf - 0.5f) / nf);  // 0..0.25
       // Highlighted cards lift up — mirrors lua's `- highlight_height`
       // term in the y formula. Click toggles the flag in GameLayer.
-      const float lift = c->Highlighted() ? kHandHighlightLift : 0.0f;
-      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - lift - bow * c->T().h * 0.4f +
+      const auto& tune = engine::tuning::hand;
+      const float lift = c->Highlighted() ? tune.highlight_lift : 0.0f;
+      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - lift - bow * c->T().h * tune.bow_factor +
                  0.03f * c->T().h * std::sin(0.666f * t + c->T().x);
     } else {
       // Play: flat row, no rotation, no wobble.

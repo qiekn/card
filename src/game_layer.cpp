@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include "engine/text.h"
+#include "engine/tuning.h"
 #include "game/card.h"
 
 namespace {
@@ -22,15 +23,14 @@ constexpr int kHandTempLimit = 8;       // CardArea slot reservation
 // at the right edge of this rect so new cards "deal" from the right rather
 // than flying in from the viewport corner.
 struct HandLayout { float x, y, w, h; };
-constexpr float kHandMaxW = 1600.0f;  // cap on wide viewports to keep cards readable
 HandLayout ComputeHandLayout(int target_w, int target_h) {
-  // 0.95 keeps cards densely fanned on narrow viewports (slot ~40% of
-  // card_w visible at 8 cards). On very wide viewports we cap at
-  // kHandMaxW so the hand doesn't spread cards out enough to lose the
-  // overlapping fan silhouette.
-  const float w = std::min(static_cast<float>(target_w) * 0.95f, kHandMaxW);
+  // w_factor / max_w / y_offset are live-tunable via the Settings panel
+  // (engine::tuning::hand). Defaults: 0.95 of viewport, capped at 1600,
+  // 80 px above the bottom.
+  const auto& tune = engine::tuning::hand;
+  const float w = std::min(static_cast<float>(target_w) * tune.w_factor, tune.max_w);
   const float x = (static_cast<float>(target_w) - w) * 0.5f;
-  const float y = static_cast<float>(target_h) - kCardH - 80.0f;
+  const float y = static_cast<float>(target_h) - kCardH - tune.y_offset;
   return {x, y, w, kCardH};
 }
 

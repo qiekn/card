@@ -3,33 +3,22 @@
 #include <algorithm>
 #include <cmath>
 
+#include "engine/tuning.h"
+
 namespace engine {
 
 namespace {
 
-// G.exp_times.* recomputed each frame in Balatro (game.lua:8181-8187).
-// K constants 50/60/190 are taste, not physics — keep them.
-constexpr float kExpKxy = 50.0f;
-constexpr float kExpKscale = 60.0f;
-constexpr float kExpKr = 190.0f;
-constexpr float kMaxVelKa = 70.0f;  // multiplied by dt to get max_vel
-
 // Snap thresholds: stop easing when both error and velocity are small.
+// Kept compile-time — these aren't taste constants, they're floating-point
+// hygiene to stop spurious oscillation around T.
 constexpr float kSnapXY = 0.01f;
 constexpr float kSnapR = 0.001f;
 constexpr float kSnapScale = 0.001f;
 
-// move_xy gain from lua: (T - VT) * 35 * dt. Why 35: Balatro taste constant.
-constexpr float kXyGain = 35.0f;
-
-// move_wh runs at constant velocity, not exp ease. 8 in lua.
-constexpr float kPinchSpeed = 8.0f;
-
-// move_r side-sway: VT.r drifts toward T.r + 0.015 * vel.x / dt.
-// 0.015 = "tilt amount per unit screen-x velocity".
-constexpr float kSwayCoeff = 0.015f;
-
 // move_juice frequencies (rad/sec) and end-of-life envelope exponents.
+// Live-tuning juice would only confuse playtesting; promote later if
+// needed.
 constexpr float kJuiceScaleFreq = 50.8f;
 constexpr float kJuiceRFreq = 40.8f;
 constexpr float kJuiceDuration = 0.4f;       // seconds
@@ -83,10 +72,11 @@ void Movable::JuiceUp(float amount, float r_amt) {
 void Movable::Move(float dt) {
   elapsed_ += dt;
 
-  const float exp_xy = std::exp(-kExpKxy * dt);
-  const float exp_scale = std::exp(-kExpKscale * dt);
-  const float exp_r = std::exp(-kExpKr * dt);
-  const float max_vel = kMaxVelKa * dt;
+  const auto& e = engine::tuning::ease;
+  const float exp_xy = std::exp(-e.exp_kxy * dt);
+  const float exp_scale = std::exp(-e.exp_kscale * dt);
+  const float exp_r = std::exp(-e.exp_kr * dt);
+  const float max_vel = e.max_vel_pps * dt;
 
   stationary_ = true;
 
@@ -118,8 +108,9 @@ void Movable::MoveXY(float dt, float exp_xy, float max_vel) {
   const bool need_y = (t_.y != vt_.y) || (std::abs(velocity_.y) > kSnapXY);
   if (!need_x && !need_y) return;
 
-  velocity_.x = exp_xy * velocity_.x + (1.0f - exp_xy) * (t_.x - vt_.x) * kXyGain * dt;
-  velocity_.y = exp_xy * velocity_.y + (1.0f - exp_xy) * (t_.y - vt_.y) * kXyGain * dt;
+  const float xy_gain = engine::tuning::ease.xy_gain;
+  velocity_.x = exp_xy * velocity_.x + (1.0f - exp_xy) * (t_.x - vt_.x) * xy_gain * dt;
+  velocity_.y = exp_xy * velocity_.y + (1.0f - exp_xy) * (t_.y - vt_.y) * xy_gain * dt;
 
   // Clamp velocity magnitude — prevents distant T jumps from launching VT
   // across the screen in one frame. Pure 2D vector clamp.
@@ -160,7 +151,8 @@ void Movable::MoveR(float dt, float exp_r) {
   // Side sway: 0.015 * vel.x / dt makes the object tilt as it slides.
   // dt > 0 always here (we accumulate elapsed_ before calling).
   const float juice_r = juice_ ? juice_->r * 2.0f : 0.0f;
-  const float sway = (dt > 0.0f) ? (kSwayCoeff * velocity_.x / dt) : 0.0f;
+  const float sway_coeff = engine::tuning::ease.sway_coeff;
+  const float sway = (dt > 0.0f) ? (sway_coeff * velocity_.x / dt) : 0.0f;
   const float des_r = t_.r + sway + juice_r;
 
   if (des_r != vt_.r || std::abs(velocity_.r) > kSnapR) {
@@ -182,9 +174,10 @@ void Movable::MoveWH(float dt) {
   const bool need_h = (t_.h != vt_.h && !pinch_y_) || (vt_.h > 0.0f && pinch_y_);
   if (!need_w && !need_h) return;
 
+  const float pinch_speed = engine::tuning::ease.pinch_speed;
   stationary_ = false;
-  vt_.w += kPinchSpeed * dt * (pinch_x_ ? -1.0f : 1.0f) * t_.w;
-  vt_.h += kPinchSpeed * dt * (pinch_y_ ? -1.0f : 1.0f) * t_.h;
+  vt_.w += pinch_speed * dt * (pinch_x_ ? -1.0f : 1.0f) * t_.w;
+  vt_.h += pinch_speed * dt * (pinch_y_ ? -1.0f : 1.0f) * t_.h;
   vt_.w = std::clamp(vt_.w, 0.0f, t_.w);
   vt_.h = std::clamp(vt_.h, 0.0f, t_.h);
 }
