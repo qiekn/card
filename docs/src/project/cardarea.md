@@ -229,11 +229,6 @@ if (IsKeyPressed(KEY_N) && hand_->Size() < kHandSoftCap) {
 if (IsKeyPressed(KEY_M) && hand_->Size() > 0) {
   hand_->RemoveBack();
 }
-if (IsKeyPressed(KEY_K) && hand_->Size() > 0) {
-  const int idx = GetRandomValue(
-      0, static_cast<int>(hand_->Size()) - 1);
-  hand_->At(static_cast<size_t>(idx))->JuiceUp(0.4f, 0.0f);
-}
 
 hand_->Tick(dt, time_);
 ```
@@ -244,32 +239,142 @@ Add / Remove 之间没需要任何"重排动画"代码：把 vector 改了下一
 平滑过去——这就是 Phase 3 那套 T/VT 分离的红利。
 
 跑起来：5 张 joker 已在 slot 里；N 加一张从右边滑入、其它 4 张往
-左让位；M 弹掉最右一张、剩下的回去填空；K 随机 squash & stretch
-一张。8 张满载时弧度最深。
+左让位；M 弹掉最右一张、剩下的回去填空。8 张满载时弧度最深。
 
-> **运行验证**：跑 `./build/card.exe` 进 Viewport，按 N 加到 8 张
-> 看扇形最完整；按 M M M 看收缩重排；按 K 看 juice 效果不会因为
-> 在扇形里就拐弯。viewport 拖大缩小，hand 跟着重新铺。
+## 8 · 鼠标接入：hover / click
+
+Phase 5 polish 把 K 键退役，改成"鼠标 hover 换 cursor，左键点切
+highlighted"。三件事要做：坐标换算、hit-test、ImGui 与 raylib 的输入
+分工。
+
+### 8.1 坐标换算
+
+scene 画在 RenderTexture2D，再被 `ImGui::Image` 显示到 Viewport
+面板里。鼠标点击的是 ImGui 的全局坐标，要换到 RT 像素坐标才能跟
+卡对上。
+
+```cpp
+ImGui::Image(tex_id, avail, ImVec2(0, 1), ImVec2(1, 0));
+
+const ImVec2 image_min = ImGui::GetItemRectMin();
+const ImVec2 m = ImGui::GetMousePos();
+const Vector2 mouse_rt{m.x - image_min.x, m.y - image_min.y};
+```
+
+`(0,1) (1,0)` 是 V 翻转——raylib FBO 在 GL texture 里上下颠倒，
+ImGui 默认 UV `(0,0)` 在顶。flip 之后**鼠标坐标不需要再翻**：raylib
+的 RT 用 top-left 原点（`BeginTextureMode` 里 `DrawLine(0,0,...)`
+画的就是左上角），ImGui 也是 top-left；中间那一步 V flip 正好把
+两套的差互相抵消。所以 `mouse_in_rt = mouse_global - image_min`，
+没有 y 取负。
+
+### 8.2 旋转矩形 hit-test
+
+每张卡的视觉位置是 `VT`（不是 `T`）——因为扇形旋转、juice 时缩放
+都写在 VT 上。lua 用 `CT = VT` 同步，我们直接读 `VT()`。
+
+旋转矩形的 hit-test 经典做法：把鼠标点反向旋转回卡的本地坐标系
+（轴对齐），再做 AABB 检查。
+
+**Listing 5**: `src/game/cardarea.cpp` 内部辅助
+
+```cpp
+bool HitRotatedRect(const engine::Transform& vt, Vector2 p) {
+  const float cx = vt.x + vt.w * 0.5f;
+  const float cy = vt.y + vt.h * 0.5f;
+  const float dx = p.x - cx;
+  const float dy = p.y - cy;
+  // -vt.r 反向旋转：把 p 变换到"卡是水平"的局部坐标系。
+  const float c = std::cos(-vt.r);
+  const float s = std::sin(-vt.r);
+  const float lx = dx * c - dy * s;
+  const float ly = dx * s + dy * c;
+  // VT.scale 同时缩放命中矩形——juice 缩 VT 时点击区也跟着缩。
+  const float hw = vt.w * vt.scale * 0.5f;
+  const float hh = vt.h * vt.scale * 0.5f;
+  return std::fabs(lx) <= hw && std::fabs(ly) <= hh;
+}
+```
+
+`FindHovered` 用反向迭代——后画的卡视觉上在上面，hit 也优先：
+
+```cpp
+Card* CardArea::FindHovered(Vector2 mouse) const {
+  for (auto it = cards_.rbegin(); it != cards_.rend(); ++it) {
+    if (HitRotatedRect((*it)->VT(), mouse)) return it->get();
+  }
+  return nullptr;
+}
+```
+
+MVP 还没有"hover 时把卡提到最上层"的 z-order，所以 Render 顺序
+== hit 优先级。Phase 6+ 真要 z-shuffle 时，hit-test 也要跟着改用
+"实际渲染顺序"——但现在两者一致。
+
+### 8.3 ImGui 与 raylib 的输入分工
+
+光是 raylib `IsMouseButtonPressed` 不够——鼠标可能在菜单栏、可能
+在 Themes 面板，那些 click 不该穿透到 hand。所以输入门控用 ImGui
+的 `IsItemHovered()`：仅当鼠标在 Image 上时才走 hit-test。
+
+```cpp
+const bool image_hovered = ImGui::IsItemHovered();
+if (image_hovered && hand_) {
+  if (game::Card* hit = hand_->FindHovered(mouse_rt)) {
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+      hit->SetHighlighted(!hit->Highlighted());
+      hit->JuiceUp(0.4f, 0.0f);
+    }
+  }
+}
+```
+
+整段挂在 `DrawViewportPanel`（OnImGuiRender 阶段）。Game::Render
+的顺序是：`OnRender` → `ImGui::NewFrame` → `OnImGuiRender`。
+input 检测在 OnImGuiRender 里、`hand_->Tick` 在 OnUpdate（下一帧
+开头）。**1 帧延迟**——点击的高亮 lift 下一帧才反应到屏幕，肉眼
+感知不到。
+
+### 8.4 highlighted 在 AlignCards 里的 lift
+
+最后一步：选中的卡视觉拔高。lua 的 `- highlight_height` 直接加到
+y 公式里；我们一样：
+
+```cpp
+const float lift = c->Highlighted() ? kHandHighlightLift : 0.0f;
+c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f
+         - lift                              // ← 选中拔高
+         - bow * c->T().h * 0.4f
+         + 0.03f * c->T().h * std::sin(...);
+```
+
+`kHandHighlightLift = 40.0f` 是 file-local 常数。lua 用
+`G.HIGHLIGHT_H` 那个 game-unit 量，我们直接像素值——跟 §5 的 bow
+翻译同理。再次的偏离原作但视觉上需要的常数 taste 改造。
+
+> **运行验证**：跑 `./build/card.exe` 进 Viewport，鼠标移到卡上
+> 看 cursor 变手；左键点击单张卡看 lift +40 px 同时 squash &
+> stretch；多张卡可以同时高亮（再点取消）；点空白处不变；点菜单
+> 栏 / Themes 面板不会误触卡。
 
 ## Caveats
 
-- **没接输入交互**：lua Card 有 hover / drag / click 三套状态机；
-  MVP 只有键盘 demo。Phase 5 polish 会接 raylib `IsMouseButton*` +
-  hit test（用 VT 而非 T，跟 lua 的 `CT = VT` 一致）。
-- **没 z-order**：Render 走 vector 顺序，左到右一层一层覆盖。lua
-  hover 时会把那张卡提到最上层；MVP 不需要 hover 所以不需要。Phase 5
-  polish 加 hover 时一起处理——大概率是"hovered card 单独最后
-  draw"那种最简单做法。
+- **drag 暂未接**：现在 click 切 highlight。lua 的 `states.drag`
+  那一套（hold-and-drag 让卡跟手 + 跨邻居重排序 + 释放回 slot）
+  defer 到 Phase 6 出牌前重排时一起做——drag controller 是单独
+  一刀，hit-test 只是基础。
+- **没 z-order**：Render 走 vector 顺序，左到右一层一层覆盖。
+  hover 时不提 z（lua 提了）。Phase 6+ 真接了 drag / hover-lift
+  时再处理——大概率是"hovered/dragged card 单独最后 draw"那种
+  最简单做法。
 - **没 sort**：lua hand 末尾按视觉 x 排序 `self.cards`，drag 跨过
   邻居时立刻换位。我们没 drag 也没必要排，emplace 顺序就是 slot
   顺序。
 - **`-0.2` 那个常数没翻译**：lua 公式末尾的 `- 0.2` 是 "整体下偏"
   ——补"中间高、两端略低于上沿" 的视觉。我们的 bow 公式中心化到 0
-  了（`bow * card_h * 0.4` 直接对称），没引入额外下偏；如果接了
-  highlight_height（选中拔高），那时再决定是 lua 的"上沿对齐 +
-  bow 偏"还是我们这套"中心 + bow 对称"，两个等价但参数不同。
-- **没 highlighted / highlight_height**：选中时拔高的逻辑（hand 用
-  `highlight_height = G.HIGHLIGHT_H`）整段 defer 到接 click 那刀。
+  了（`bow * card_h * 0.4` 直接对称），没引入额外下偏。highlighted
+  lift 单独一项加在前面，跟 bow 不耦合。
 - **drag-from-deck 视觉缺失**：spawn 在 hand 右边缘是 cheap trick
   ——真正 Balatro 是从屏幕外的 deck 堆顶飞过来。Phase 6 deck area
   起来后再换成"从 deck.T.{x,y} 起飞"。
