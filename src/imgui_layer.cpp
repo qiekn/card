@@ -46,10 +46,19 @@ void ImGuiLayer::OnAttach() {
 
   ApplyTheme(selected_theme_);
 
-  // If the user has no saved imgui.ini we apply our default game-engine
-  // layout on the first frame. Subsequent runs reuse the user's saved layout.
+  // First-run layout resolution. ImGui already auto-loaded `imgui.ini`
+  // if present; if not, prefer a committed `imgui_default.ini` snapshot
+  // (so fresh clones inherit the project's curated layout) and fall
+  // back to the hardcoded SetupDefaultLayout only when neither file
+  // exists.
   const char* ini = io.IniFilename ? io.IniFilename : "imgui.ini";
-  needs_default_layout_ = !std::filesystem::exists(ini);
+  if (!std::filesystem::exists(ini)) {
+    if (std::filesystem::exists("imgui_default.ini")) {
+      ImGui::LoadIniSettingsFromDisk("imgui_default.ini");
+    } else {
+      needs_default_layout_ = true;
+    }
+  }
 }
 
 void ImGuiLayer::OnDetach() {
