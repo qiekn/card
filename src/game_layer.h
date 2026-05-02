@@ -74,4 +74,11 @@ class GameLayer : public Layer {
   // constructible (it needs viewport dims) and we build it in OnAttach.
   std::optional<game::CardArea> hand_;
   int next_sprite_idx_ = 0;  // walks through Joker atlas as cards are added
+
+  // Drag/click arbitration state — see DrawViewportPanel. pressed_card_
+  // is the card under the most recent mouse-down; if the mouse drags
+  // past ImGui's threshold before release we hand off to CardArea's
+  // drag controller, otherwise the release is treated as a click.
+  game::Card* pressed_card_ = nullptr;
+  Vector2 pressed_origin_rt_{};
 };

@@ -48,6 +48,20 @@ std::unique_ptr<Card> CardArea::RemoveBack() {
 
 void CardArea::Tick(float dt, float real_time) {
   AlignCards(real_time);
+  if (dragged_ != nullptr) {
+    // Drag controller writes the dragged card's T directly from the cursor
+    // (AlignCards skipped it). r=0 so a held card reads as level — lua
+    // does the same: dragged cards lose their fan tilt while in hand.
+    dragged_->T().x = drag_mouse_.x - drag_offset_.x;
+    dragged_->T().y = drag_mouse_.y - drag_offset_.y;
+    dragged_->T().r = 0.0f;
+    // Reorder by visual x so neighbors slide out of the way as the dragged
+    // card crosses their slot center. stable_sort prevents jitter when two
+    // cards share an x exactly. Next frame's AlignCards uses the new
+    // indices to compute neighbors' new slots — they ease into place.
+    std::stable_sort(cards_.begin(), cards_.end(),
+                     [](const auto& a, const auto& b) { return a->T().x < b->T().x; });
+  }
   for (auto& c : cards_) c->Move(dt);
 }
 
@@ -69,7 +83,12 @@ void CardArea::SetBounds(float x, float y, float w, float h) {
 }
 
 void CardArea::Render() {
-  for (auto& c : cards_) c->Render();
+  // Draw non-dragged cards in slot order, then the dragged card last so
+  // it floats above its neighbors during drag.
+  for (auto& c : cards_) {
+    if (c.get() != dragged_) c->Render();
+  }
+  if (dragged_ != nullptr) dragged_->Render();
 }
 
 Card* CardArea::FindHovered(Vector2 mouse) const {
@@ -82,6 +101,18 @@ Card* CardArea::FindHovered(Vector2 mouse) const {
   return nullptr;
 }
 
+void CardArea::StartDrag(Card* card, Vector2 mouse) {
+  if (card == nullptr) return;
+  dragged_ = card;
+  drag_offset_.x = mouse.x - card->T().x;
+  drag_offset_.y = mouse.y - card->T().y;
+  drag_mouse_ = mouse;
+}
+
+void CardArea::UpdateDrag(Vector2 mouse) { drag_mouse_ = mouse; }
+
+void CardArea::StopDrag() { dragged_ = nullptr; }
+
 void CardArea::AlignCards(float t) {
   const int n = static_cast<int>(cards_.size());
   if (n == 0) return;
@@ -93,6 +124,7 @@ void CardArea::AlignCards(float t) {
   for (int idx = 0; idx < n; ++idx) {
     const int k = idx + 1;  // 1-based to match lua formulas
     Card* c = cards_[idx].get();
+    if (c == dragged_) continue;  // drag controller owns this card's T this frame
     const float kf = static_cast<float>(k);
 
     // Shared x slot — same shape for Hand and Play (cardarea.lua:692-722,

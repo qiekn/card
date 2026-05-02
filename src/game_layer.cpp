@@ -163,7 +163,7 @@ void GameLayer::DrawScene() {
   // proper hover-lift z handling).
   if (hand_) hand_->Render();
 
-  engine::DrawTextBold(TextFormat("Hand: %zu/%d   (N add, M remove, click to highlight)",
+  engine::DrawTextBold(TextFormat("Hand: %zu/%d   (N add, M remove, click highlight, drag reorder)",
                                   hand_ ? hand_->Size() : 0u, kHandSoftCap),
                        Vector2{16, 16}, 18, RAYWHITE);
   engine::DrawText(TextFormat("atlas tier=%dx   real_time=%.1fs", texture_scale_, time_),
@@ -198,22 +198,46 @@ void GameLayer::DrawViewportPanel() {
     const ImTextureID tex_id = static_cast<ImTextureID>(target_.texture.id);
     ImGui::Image(tex_id, avail, ImVec2(0, 1), ImVec2(1, 0));
 
-    // Card hover / click: hit-test runs only when the mouse is over the
-    // image (so menu bar / other panels keep ImGui's default behavior).
-    // Mouse-in-RT coords are screen-relative-to-image-top-left; the V
-    // flip on the Image doesn't change cursor mapping, raylib's RT
-    // origin and ImGui's image origin both sit at the top-left after
-    // the flip cancels out.
-    const bool image_hovered = ImGui::IsItemHovered();
+    // Card hover / click / drag arbitration. mouse_rt stays valid even when
+    // the cursor leaves the image — useful while dragging off-edge.
     const ImVec2 image_min = ImGui::GetItemRectMin();
-    if (image_hovered && hand_) {
-      const ImVec2 m = ImGui::GetMousePos();
-      const Vector2 mouse_rt{m.x - image_min.x, m.y - image_min.y};
-      if (game::Card* hit = hand_->FindHovered(mouse_rt)) {
+    const ImVec2 m = ImGui::GetMousePos();
+    const Vector2 mouse_rt{m.x - image_min.x, m.y - image_min.y};
+    const bool image_hovered = ImGui::IsItemHovered();
+
+    if (hand_) {
+      // Hand cursor on hover (only when not already dragging — dragging
+      // gets the system "grabbing" cursor implicitly via ImGui's drag).
+      if (image_hovered && !hand_->IsDragging() && hand_->FindHovered(mouse_rt)) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-          hit->SetHighlighted(!hit->Highlighted());
-          hit->JuiceUp(0.4f, 0.0f);
+      }
+
+      // Mouse-down inside the image picks the candidate card. Outside
+      // clicks (menu bar, panels) are ignored because IsItemHovered
+      // gates this branch.
+      if (image_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        pressed_card_ = hand_->FindHovered(mouse_rt);
+        pressed_origin_rt_ = mouse_rt;
+      }
+
+      // While the mouse stays down on a candidate: promote to drag once
+      // ImGui's drag threshold is crossed, then forward cursor updates.
+      if (pressed_card_ != nullptr) {
+        if (!hand_->IsDragging() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+          hand_->StartDrag(pressed_card_, pressed_origin_rt_);
+        }
+        if (hand_->IsDragging()) {
+          hand_->UpdateDrag(mouse_rt);
+        }
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+          if (hand_->IsDragging()) {
+            hand_->StopDrag();
+          } else {
+            // Click without drag → toggle highlight + JuiceUp feedback.
+            pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
+            pressed_card_->JuiceUp(0.4f, 0.0f);
+          }
+          pressed_card_ = nullptr;
         }
       }
     }

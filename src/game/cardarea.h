@@ -68,6 +68,18 @@ class CardArea {
   // nullptr if no card is hit.
   Card* FindHovered(Vector2 mouse) const;
 
+  // Drag controller. StartDrag records the mouse-to-card offset so
+  // UpdateDrag can write `dragged.T` such that the card holds its
+  // grabbed position relative to the cursor. While dragged, AlignCards
+  // skips writing the card's T (drag controller owns it), Tick stable-
+  // sorts cards_ by T.x so neighbors reorder around the drag, and
+  // Render paints the dragged card last so it stays on top.
+  void StartDrag(Card* card, Vector2 mouse);
+  void UpdateDrag(Vector2 mouse);
+  void StopDrag();
+  bool IsDragging() const { return dragged_ != nullptr; }
+  Card* DraggedCard() const { return dragged_; }
+
   size_t Size() const { return cards_.size(); }
   Card* At(size_t i) { return cards_[i].get(); }
 
@@ -89,6 +101,11 @@ class CardArea {
   int temp_limit_ = 8;      // reserves slot-room when n < temp_limit (hand)
 
   std::vector<std::unique_ptr<Card>> cards_;
+
+  // Drag state — non-null only between StartDrag and StopDrag.
+  Card* dragged_ = nullptr;
+  Vector2 drag_offset_{};   // mouse - card.T at click; keeps grab point stable
+  Vector2 drag_mouse_{};    // last mouse pos in RT coords
 };
 
 }  // namespace game
