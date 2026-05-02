@@ -13,9 +13,13 @@ Atlas::Atlas(const char* path, int px, int py) : px_(px), py_(py) {
                  path);
     return;
   }
-  // POINT keeps Balatro's pixel art crisp at any draw-time scale; bilinear
-  // would smear the 1px outlines that frame every card.
-  SetTextureFilter(texture_, TEXTURE_FILTER_POINT);
+  // BILINEAR rather than POINT: rotated card edges sampled at sub-pixel
+  // boundaries get 4-texel blending instead of nearest, which kills the
+  // stair-stepping you'd otherwise see at any non-zero `T.r` (every card
+  // in the hand fan, basically). Trade-off: tiny softening of pixel-art
+  // detail at non-integer scales — acceptable on 4K, where the high
+  // pixel density already hides the difference.
+  SetTextureFilter(texture_, TEXTURE_FILTER_BILINEAR);
 }
 
 Atlas::~Atlas() {
