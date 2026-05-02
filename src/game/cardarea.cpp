@@ -52,9 +52,18 @@ void CardArea::Tick(float dt, float real_time) {
     // Drag controller writes the dragged card's T directly from the cursor
     // (AlignCards skipped it). r=0 so a held card reads as level — lua
     // does the same: dragged cards lose their fan tilt while in hand.
-    dragged_->T().x = drag_mouse_.x - drag_offset_.x;
-    dragged_->T().y = drag_mouse_.y - drag_offset_.y;
+    const float tx = drag_mouse_.x - drag_offset_.x;
+    const float ty = drag_mouse_.y - drag_offset_.y;
+    dragged_->T().x = tx;
+    dragged_->T().y = ty;
     dragged_->T().r = 0.0f;
+    // Snap VT.{x,y} to T so the card is glued to the cursor — Movable's
+    // ease constants (35*dt force, 50/s damping) are tuned for "settle
+    // into slot", which lags ~30 ms and feels like swimming during drag.
+    // r / scale stay eased so the grab still wobbles smoothly into level
+    // (and juice continues to play out if the card was juicing).
+    dragged_->VT().x = tx;
+    dragged_->VT().y = ty;
     // Reorder by visual x so neighbors slide out of the way as the dragged
     // card crosses their slot center. stable_sort prevents jitter when two
     // cards share an x exactly. Next frame's AlignCards uses the new
