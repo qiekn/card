@@ -36,7 +36,7 @@ struct HandLayout {
   float max_w = 1600.0f;           // hard cap on hand width (wide viewports)
   float y_offset = 80.0f;          // px above viewport bottom
   float bow_factor = 0.4f;         // y-bow scale, as fraction of card_h
-  float highlight_lift = 40.0f;    // px lift applied to highlighted cards
+  float highlight_lift = 80.0f;    // px lift applied to highlighted cards
 };
 
 inline MovableEase ease;
