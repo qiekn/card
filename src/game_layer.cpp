@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include "engine/text.h"
 #include "engine/tuning.h"
@@ -191,6 +192,19 @@ void GameLayer::DrawViewportPanel() {
   if (!open) {
     ImGui::End();
     return;
+  }
+
+  // Auto-hide the dock node's tab bar when only Viewport is in the node.
+  // Other windows docked into the same node bring the tab bar back so
+  // the user can switch between them. Pattern lifted from ck-engine.
+  if (ImGui::IsWindowDocked()) {
+    if (ImGuiDockNode* node = ImGui::GetWindowDockNode()) {
+      if (node->Windows.Size == 1) {
+        node->LocalFlags |= ImGuiDockNodeFlags_NoTabBar;
+      } else {
+        node->LocalFlags &= ~ImGuiDockNodeFlags_NoTabBar;
+      }
+    }
   }
 
   const ImVec2 avail = ImGui::GetContentRegionAvail();
