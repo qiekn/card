@@ -1,5 +1,6 @@
 #include "game_layer.h"
 
+#include <algorithm>
 #include <memory>
 
 #include <imgui.h>
@@ -21,10 +22,13 @@ constexpr int kHandTempLimit = 8;       // CardArea slot reservation
 // at the right edge of this rect so new cards "deal" from the right rather
 // than flying in from the viewport corner.
 struct HandLayout { float x, y, w, h; };
+constexpr float kHandMaxW = 1600.0f;  // cap on wide viewports to keep cards readable
 HandLayout ComputeHandLayout(int target_w, int target_h) {
-  // 0.6 keeps a generous fan overlap on 1080p viewports and still leaves
-  // breathing room on 4K. No upper cap — let the hand grow with the panel.
-  const float w = static_cast<float>(target_w) * 0.6f;
+  // 0.95 keeps cards densely fanned on narrow viewports (slot ~40% of
+  // card_w visible at 8 cards). On very wide viewports we cap at
+  // kHandMaxW so the hand doesn't spread cards out enough to lose the
+  // overlapping fan silhouette.
+  const float w = std::min(static_cast<float>(target_w) * 0.95f, kHandMaxW);
   const float x = (static_cast<float>(target_w) - w) * 0.5f;
   const float y = static_cast<float>(target_h) - kCardH - 80.0f;
   return {x, y, w, kCardH};
