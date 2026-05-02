@@ -188,10 +188,13 @@ void Game::Render() {
   } else {
     // Hidden mode: OnImGuiRender (which normally hosts the hand mouse
     // arbitration via DrawViewportPanel) is skipped. Route input here
-    // instead — the RT covers the full backbuffer, so ImGui's mouse pos
-    // is already in RT coords and the whole window counts as hovered.
+    // instead — the RT covers the full backbuffer, so the whole window
+    // counts as hovered. With ConfigFlags_ViewportsEnable, ImGui's
+    // MousePos is in absolute desktop coords; subtract the main
+    // viewport's Pos to convert to window-relative (= RT) coords.
+    const ImVec2 vp = ImGui::GetMainViewport()->Pos;
     const ImVec2 m = ImGui::GetMousePos();
-    game_layer_->ProcessHandInput(Vector2{m.x, m.y}, true);
+    game_layer_->ProcessHandInput(Vector2{m.x - vp.x, m.y - vp.y}, true);
   }
   imgui_layer_->End();
 
