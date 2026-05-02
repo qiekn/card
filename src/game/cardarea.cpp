@@ -157,7 +157,10 @@ void CardArea::AlignCards(float t) {
       // term in the y formula. Click toggles the flag in GameLayer.
       const auto& tune = engine::tuning::hand;
       const float lift = c->Highlighted() ? tune.highlight_lift : 0.0f;
-      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - lift - bow * c->T().h * tune.bow_factor +
+      // bow term pulls cards DOWN (positive y), edges more than middle.
+      // Net silhouette: ⌒ — middle higher than edges, which is the lua
+      // hand-fan shape. bow_factor=0 gives a flat row.
+      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - lift + bow * c->T().h * tune.bow_factor +
                  0.03f * c->T().h * std::sin(0.666f * t + c->T().x);
     } else {
       // Play: flat row, no rotation, no wobble.
