@@ -153,8 +153,19 @@ void ImGuiLayer::DrawMainMenuBar() {
     if (viewport_no_titlebar_) {
       ImGui::MenuItem("Hide Viewport Title Bar", nullptr, viewport_no_titlebar_);
     }
+    if (ImGui::MenuItem("Save Layout as Default")) {
+      // Snapshots the live ImGui dock state into a separate file that
+      // Reset Layout below will prefer over the hardcoded layout.
+      ImGui::SaveIniSettingsToDisk("imgui_default.ini");
+    }
     if (ImGui::MenuItem("Reset Layout")) {
-      needs_default_layout_ = true;
+      // Prefer the saved snapshot if present; fall back to the built-in
+      // SetupDefaultLayout otherwise.
+      if (std::filesystem::exists("imgui_default.ini")) {
+        ImGui::LoadIniSettingsFromDisk("imgui_default.ini");
+      } else {
+        needs_default_layout_ = true;
+      }
     }
     ImGui::Separator();
     ImGuiIO& io = ImGui::GetIO();
