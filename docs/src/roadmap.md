@@ -103,6 +103,8 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
 - [x] 8 张卡弧形排列 demo，加/减卡平滑重排
 - [x] `engine::AtlasRegistry`（by-name lookup + 跨 tier reload pointer-stable）
 - [x] hover/click highlight + 旋转矩形 hit-test（hover 换 cursor，click 切 highlighted lift +40 px + JuiceUp）
+- [x] drag-to-reorder（按住卡跟手 + 跨邻居 stable_sort by T.x → 邻居 ease 让位 + 释放回 slot）
+- [x] `engine::tuning` + ImGui Settings 面板（live tune ease/hand 常数，详见 `project/tuning.md`）
 
 ### 经验教训
 
@@ -158,6 +160,25 @@ _(每勾掉一项就在这里补一段：哪些 lua 行没看懂折腾了多久 
   跟 ImGui 的输入仲裁配合，菜单栏 / 面板上的 click 不会穿透。这
   也意味着 input 必须挂在 OnImGuiRender 里、而不是 OnUpdate
   ——多 1 帧延迟，肉眼无感。
+- **drag 跟手必须 snap VT.x/y**：写完 `dragged.T = mouse - offset`
+  之后 Movable 的 ease 还在跑，VT 滞后 T 几十 ms——drag 时这种
+  滞后等于卡在跟着鼠标"游泳"。手动 `dragged.VT() = T` 强制无延
+  迟。r/scale 不 snap 还是好的：抓起卡时 fan tilt 平下来 + juice
+  余响要顺出来。第一版按 lua "verbatim 抄" 没踩到，drag 接进来才
+  暴露。
+- **lua taste 常数搬 pixel-direct 出 BUG**：`max_vel = 70` 在 lua
+  是 game-units/sec（× tile-scale 约 30 → 2100 px/sec），我们当
+  pixel/sec 直接搬就是 70 px/sec ≈ 1.17 px/frame@60fps，drag 200
+  px snapback 要 2.8 秒。`sway_coeff = 0.015` 同样问题（vel.x 量
+  级差 30 倍 → 卡飞着打转）。教训：lua 的 `verbatim 抄 K 常数`
+  这条规则有个隐藏前提是 game-unit 量级。我们的 pixel-direct port
+  里全部得按 ~30× 的换算系数核对，或者干脆暴露成 tunable（最后选
+  的就是后者，加了 `engine::tuning` + Settings 面板）。
+- **drag 无 z-order 必须 Render 时单独画 dragged**：vector 顺序
+  = 画顺序，stable_sort 把 dragged 挪到中间索引时，会被右边邻居
+  画上来盖住。lua 的 hover/drag 都提 z；我们 MVP 的简化做法：
+  Render 里 if-skip dragged + 末尾再画一次。zero-alloc，零 z 状
+  态机。
 
 ## Phase 6 — 一轮玩法循环
 
