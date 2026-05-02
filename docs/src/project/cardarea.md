@@ -342,39 +342,188 @@ input 检测在 OnImGuiRender 里、`hand_->Tick` 在 OnUpdate（下一帧
 y 公式里；我们一样：
 
 ```cpp
-const float lift = c->Highlighted() ? kHandHighlightLift : 0.0f;
+const auto& tune = engine::tuning::hand;
+const float lift = c->Highlighted() ? tune.highlight_lift : 0.0f;
 c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f
          - lift                              // ← 选中拔高
-         - bow * c->T().h * 0.4f
+         + bow * c->T().h * tune.bow_factor
          + 0.03f * c->T().h * std::sin(...);
 ```
 
-`kHandHighlightLift = 40.0f` 是 file-local 常数。lua 用
-`G.HIGHLIGHT_H` 那个 game-unit 量，我们直接像素值——跟 §5 的 bow
-翻译同理。再次的偏离原作但视觉上需要的常数 taste 改造。
+`tune.highlight_lift` 是 `engine::tuning::hand` 里的字段（默认 40 px，
+Settings 面板可调，详见 `project/tuning.md`）。lua 用 `G.HIGHLIGHT_H`
+那个 game-unit 量，我们直接像素值——跟 §5 的 bow 翻译同理。再次的
+偏离原作但视觉上需要的常数 taste 改造。
 
 > **运行验证**：跑 `./build/card.exe` 进 Viewport，鼠标移到卡上
 > 看 cursor 变手；左键点击单张卡看 lift +40 px 同时 squash &
 > stretch；多张卡可以同时高亮（再点取消）；点空白处不变；点菜单
 > 栏 / Themes 面板不会误触卡。
 
+## 9 · 拖拽：drag controller
+
+click 之上再加一档：按住卡拖到任意位置，松手回 slot；拖过邻居时
+邻居自动让位重排。lua 的 `states.drag` 那一套——MVP 内基本算
+"hand 内重排序" 用的，跨 area 转移留给 Phase 6 出牌时一起接。
+
+四件事：跟手、不让 align 覆盖、跨邻居换位、画在最上层。
+
+### 9.1 CardArea 持 drag 状态
+
+```cpp
+class CardArea {
+  // ...
+  void StartDrag(Card* card, Vector2 mouse);
+  void UpdateDrag(Vector2 mouse);
+  void StopDrag();
+  bool IsDragging() const { return dragged_ != nullptr; }
+
+ private:
+  Card* dragged_ = nullptr;
+  Vector2 drag_offset_{};   // mouse - card.T at click
+  Vector2 drag_mouse_{};    // last mouse pos in RT coords
+};
+```
+
+`drag_offset_` 在 StartDrag 时定下来：`offset = mouse - card.T`。
+之后 UpdateDrag 只更新 `drag_mouse_`，Tick 再算 `card.T = mouse -
+offset`——这样卡的"被抓住的那个点"始终贴在光标上（不是卡的 0,0
+角，也不是中心）。
+
+### 9.2 AlignCards 跳过 dragged
+
+drag controller 要独占 dragged 卡的 T，align 公式就得让位：
+
+```cpp
+for (int idx = 0; idx < n; ++idx) {
+  Card* c = cards_[idx].get();
+  if (c == dragged_) continue;  // drag 控制 T，align 不写
+  // ... 公式 ...
+}
+```
+
+### 9.3 Tick：写 T，snap VT，重排 vector
+
+```cpp
+void CardArea::Tick(float dt, float real_time) {
+  AlignCards(real_time);              // ① 写非 dragged 的 T
+
+  if (dragged_ != nullptr) {
+    const float tx = drag_mouse_.x - drag_offset_.x;
+    const float ty = drag_mouse_.y - drag_offset_.y;
+    dragged_->T().x = tx;
+    dragged_->T().y = ty;
+    dragged_->T().r = 0.0f;           // ② 握住的卡水平
+    // ③ snap VT.x/y 到 T——卡贴住光标无延迟
+    dragged_->VT().x = tx;
+    dragged_->VT().y = ty;
+    // ④ 按视觉 x 排序，dragged 越邻居 vector 索引就跟着换
+    std::stable_sort(
+        cards_.begin(), cards_.end(),
+        [](const auto& a, const auto& b) {
+          return a->T().x < b->T().x;
+        });
+  }
+
+  for (auto& c : cards_) c->Move(dt);  // ⑤ ease (dragged: T==VT 等于 noop)
+}
+```
+
+逐项理由：
+
+- **② r=0 但只写 T.r**——VT.r 不 snap。这样从 fan tilt（譬如 0.1
+  rad）到 0 是 ease 出来的，"抓起卡时它平下来"有过渡。如果同时
+  snap 了 VT.r，鼠标按下那一帧卡会突跳到水平。
+- **③ snap VT.x/y**——这是关键。Movable 的 ease 常数是为"settle
+  into slot"调的，VT 滞后 T 几十 ms。drag 时几十 ms 的滞后等于卡
+  在跟着鼠标"游泳"。直接写 `VT().x = T.x` 强制无延迟。release 后
+  AlignCards 重新接管 dragged 卡的 T，ease 平滑回 slot。
+- **④ stable_sort by T.x**——dragged 跟着鼠标，T.x 落在哪两个邻
+  居中间就排到那。下一帧 AlignCards 用**新的 vector 索引**给非
+  dragged 邻居算 slot，邻居 ease 让位（这是免费动画——T 变了
+  Movable 自然平滑过去，不需要写"邻居重排"代码）。`stable_sort`
+  避免相同 x 时的 jitter（譬如 dragged 和邻居恰好同 x 一帧）。
+- **⑤ Move(dt) 仍调用 dragged**——不省这一行因为：① VT.r / VT.scale
+  还在 ease（fan tilt 平下来 / juice 余响）；② T==VT 时 MoveXY
+  里的 `need_x` 检查会快路径返回，性能无损。
+
+### 9.4 Render：dragged 最后画
+
+vector 顺序 = 画顺序 = z-order。被拖的卡如果不强制画在最后，被
+旁边的卡盖住一半（特别是 stable_sort 把它挪到中间索引时）。
+
+```cpp
+void CardArea::Render() {
+  for (auto& c : cards_) {
+    if (c.get() != dragged_) c->Render();
+  }
+  if (dragged_ != nullptr) dragged_->Render();
+}
+```
+
+### 9.5 GameLayer：click 还是 drag？
+
+按下时不知道是 click 还是 drag——要等 mouse 移动超过 ImGui 内置
+阈值（默认 ~6 px）才认定 drag。所以三态：
+
+| 状态 | 触发 | 动作 |
+|--|--|--|
+| 候选 | mouse-down 在卡上 | 记 `pressed_card_` + `pressed_origin_rt_` |
+| 升级到 drag | `IsMouseDragging(0)` 返回 true | StartDrag(候选, origin)，进入 drag 闭环 |
+| 释放 | `IsMouseReleased(0)` | dragging? StopDrag : 把候选当 click 处理（toggle highlight + JuiceUp）|
+
+```cpp
+if (image_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+  pressed_card_ = hand_->FindHovered(mouse_rt);
+  pressed_origin_rt_ = mouse_rt;
+}
+
+if (pressed_card_ != nullptr) {
+  if (!hand_->IsDragging() &&
+      ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    hand_->StartDrag(pressed_card_, pressed_origin_rt_);
+  }
+  if (hand_->IsDragging()) {
+    hand_->UpdateDrag(mouse_rt);
+  }
+  if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    if (hand_->IsDragging()) {
+      hand_->StopDrag();
+    } else {
+      pressed_card_->SetHighlighted(!pressed_card_->Highlighted());
+      pressed_card_->JuiceUp(0.4f, 0.0f);
+    }
+    pressed_card_ = nullptr;
+  }
+}
+```
+
+注意：进入 drag 后 ImGui 自动把 mouse 当作"按住状态"——即使光标
+离开了 viewport image，`IsMouseDragging` / `IsMouseReleased` 仍然
+能检测到。所以拖卡甩到菜单栏外面再松手也能正确收尾。
+
+> **运行验证**：跑 `./build/card.exe` 进 Viewport，按住一张卡拖
+> 来回——卡跟手无延迟（snap）、邻居 ease 让位、释放后回到当前
+> mouse-x 对应的 slot；甩出 viewport 释放也能正确回 slot；快速点
+> 一下不进入 drag，只 toggle highlight。
+
 ## Caveats
 
-- **drag 暂未接**：现在 click 切 highlight。lua 的 `states.drag`
-  那一套（hold-and-drag 让卡跟手 + 跨邻居重排序 + 释放回 slot）
-  defer 到 Phase 6 出牌前重排时一起做——drag controller 是单独
-  一刀，hit-test 只是基础。
-- **没 z-order**：Render 走 vector 顺序，左到右一层一层覆盖。
-  hover 时不提 z（lua 提了）。Phase 6+ 真接了 drag / hover-lift
-  时再处理——大概率是"hovered/dragged card 单独最后 draw"那种
-  最简单做法。
-- **没 sort**：lua hand 末尾按视觉 x 排序 `self.cards`，drag 跨过
-  邻居时立刻换位。我们没 drag 也没必要排，emplace 顺序就是 slot
-  顺序。
+- **没跨 area drag**：MVP 内 drag 只在 hand 自己里面重排。lua 的
+  drag 可以从 hand 拖到 play area 或反过来——Phase 6 接出牌时把
+  "drop target" 那一套加进来，CardArea 之间的 unique_ptr 移交走
+  我们已留好的 `RemoveBack()` 接口（只是 release 时根据 mouse 位
+  置选目的 area 而已）。
+- **没 z-order**：Render 走 vector 顺序，左到右一层一层覆盖；只有
+  dragged 单独画在最后。lua 的 hover 也提 z（hovered card 单独最
+  上层），我们的 hover 不提 z——MVP 内不强求。要做就再加个
+  `hovered_` 字段，Render 跟 dragged 一样的处理。
 - **`-0.2` 那个常数没翻译**：lua 公式末尾的 `- 0.2` 是 "整体下偏"
   ——补"中间高、两端略低于上沿" 的视觉。我们的 bow 公式中心化到 0
-  了（`bow * card_h * 0.4` 直接对称），没引入额外下偏。highlighted
-  lift 单独一项加在前面，跟 bow 不耦合。
+  了（`bow * card_h * tune.bow_factor` 直接对称），没引入额外下偏。
+  highlighted lift 单独一项加在前面，跟 bow 不耦合。
 - **drag-from-deck 视觉缺失**：spawn 在 hand 右边缘是 cheap trick
   ——真正 Balatro 是从屏幕外的 deck 堆顶飞过来。Phase 6 deck area
   起来后再换成"从 deck.T.{x,y} 起飞"。
+- **drag 启动阈值靠 ImGui**：`IsMouseDragging` 用 `io.MouseDragThreshold`
+  默认 ~6 px。手感不够再开个 tuning 暴露——大概率不需要。
