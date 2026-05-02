@@ -60,15 +60,15 @@ class GameLayer : public Layer {
   Color background_color_{30, 30, 46, 255};  // overridden per-frame by Game
   // Mirrors Balatro's G.SETTINGS.GRAPHICS.texture_scaling: picks which
   // assets/textures/{N}x/ subdir we sample. The Themes panel writes via
-  // TextureScalePtr(); OnUpdate observes the delta and reloads. Default
-  // 2 — what we ship in the repo. 1 / 4 work if you populate the dir.
+  // TextureScalePtr(); OnUpdate compares against atlases_.Tier() and
+  // reloads on delta. If the target dir is missing the registry keeps
+  // its previous tier and we revert this field to match. Default 2 —
+  // what we ship in the repo. 1 / 4 work if you populate the dir.
   int texture_scale_ = 2;
-  // What tier is currently on the GPU. Stays 0 until first successful
-  // load — that initial mismatch is what kicks OnAttach's load.
-  int applied_texture_scale_ = 0;
   // Eager-loaded atlases from assets/atlases.json. Reload on tier change
   // is in-place (move-assign into existing slots), so the borrowed
-  // Atlas* in `demo_` stays valid across the Themes panel combo flips.
+  // Atlas* in each Card stays valid across the Themes panel combo flips.
+  // The registry's Tier() is the source of truth for "what's on the GPU".
   engine::AtlasRegistry atlases_;
   // Phase 5 hand demo. std::optional because CardArea isn't default-
   // constructible (it needs viewport dims) and we build it in OnAttach.

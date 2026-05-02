@@ -47,9 +47,10 @@ void GameLayer::OnAttach() {
   // before the Viewport panel reports its real size.
   EnsureTarget(1280, 720);
 
-  if (atlases_.Load("assets/atlases.json", texture_scale_)) {
-    applied_texture_scale_ = texture_scale_;
-  }
+  // Eager-load every atlas in the manifest at the user-configured tier.
+  // Failure leaves the registry empty and atlases_.Tier() at 0; OnUpdate's
+  // mismatch path will revert texture_scale_ on the next tier flip.
+  atlases_.Load("assets/atlases.json", texture_scale_);
 
   // Build the hand area at the bottom of the (initial) viewport. SetBounds
   // refreshes this every frame in OnUpdate so a viewport resize keeps the
@@ -86,11 +87,9 @@ void GameLayer::OnUpdate(float dt) {
   // Registry reload is in-place move-assign, so each Card's borrowed
   // Atlas pointer stays valid; the only side-effect is its src rect
   // gets bigger / smaller at draw time via CellPx/Py.
-  if (texture_scale_ != applied_texture_scale_) {
-    if (atlases_.Load("assets/atlases.json", texture_scale_)) {
-      applied_texture_scale_ = texture_scale_;
-    } else {
-      texture_scale_ = applied_texture_scale_;
+  if (texture_scale_ != atlases_.Tier()) {
+    if (!atlases_.Load("assets/atlases.json", texture_scale_)) {
+      texture_scale_ = atlases_.Tier();
     }
   }
 
