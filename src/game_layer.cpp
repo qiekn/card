@@ -114,11 +114,6 @@ void GameLayer::OnUpdate(float dt) {
   if (IsKeyPressed(KEY_M) && hand_->Size() > 0) {
     hand_->RemoveBack();
   }
-  // K juices a random card so the squash/stretch is visible mid-fan.
-  if (IsKeyPressed(KEY_K) && hand_->Size() > 0) {
-    const int idx = GetRandomValue(0, static_cast<int>(hand_->Size()) - 1);
-    hand_->At(static_cast<size_t>(idx))->JuiceUp(0.4f, 0.0f);
-  }
 
   hand_->Tick(dt, time_);
 }
@@ -169,7 +164,7 @@ void GameLayer::DrawScene() {
   // proper hover-lift z handling).
   if (hand_) hand_->Render();
 
-  engine::DrawTextBold(TextFormat("Hand: %zu/%d   (N add, M remove, K juice random)",
+  engine::DrawTextBold(TextFormat("Hand: %zu/%d   (N add, M remove, click to highlight)",
                                   hand_ ? hand_->Size() : 0u, kHandSoftCap),
                        Vector2{16, 16}, 18, RAYWHITE);
   engine::DrawText(TextFormat("atlas tier=%dx   real_time=%.1fs", texture_scale_, time_),
@@ -203,6 +198,26 @@ void GameLayer::DrawViewportPanel() {
     // so flip V.
     const ImTextureID tex_id = static_cast<ImTextureID>(target_.texture.id);
     ImGui::Image(tex_id, avail, ImVec2(0, 1), ImVec2(1, 0));
+
+    // Card hover / click: hit-test runs only when the mouse is over the
+    // image (so menu bar / other panels keep ImGui's default behavior).
+    // Mouse-in-RT coords are screen-relative-to-image-top-left; the V
+    // flip on the Image doesn't change cursor mapping, raylib's RT
+    // origin and ImGui's image origin both sit at the top-left after
+    // the flip cancels out.
+    const bool image_hovered = ImGui::IsItemHovered();
+    const ImVec2 image_min = ImGui::GetItemRectMin();
+    if (image_hovered && hand_) {
+      const ImVec2 m = ImGui::GetMousePos();
+      const Vector2 mouse_rt{m.x - image_min.x, m.y - image_min.y};
+      if (game::Card* hit = hand_->FindHovered(mouse_rt)) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+          hit->SetHighlighted(!hit->Highlighted());
+          hit->JuiceUp(0.4f, 0.0f);
+        }
+      }
+    }
   }
 
   // Right-click anywhere in the viewport for the toggle — essential when the

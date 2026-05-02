@@ -12,11 +12,17 @@ namespace game {
 // Phase 6 grows this into the real lua Card: rank/suit, center (Joker /
 // Tarot / enhancement), front+back+floating sprites, facing/flipping,
 // CT for hit-testing during drag. For now it's literally a named Sprite
-// so the demo wires CardArea against a concrete game type.
+// plus a `highlighted_` flag (selection lift) so the demo wires CardArea
+// against a concrete game type.
 class Card : public engine::Sprite {
  public:
-  Card(float x, float y, float w, float h, const engine::Atlas& atlas,
-       int sprite_pos_x, int sprite_pos_y);
+  Card(float x, float y, float w, float h, const engine::Atlas& atlas, int sprite_pos_x, int sprite_pos_y);
+
+  bool Highlighted() const { return highlighted_; }
+  void SetHighlighted(bool h) { highlighted_ = h; }
+
+ private:
+  bool highlighted_ = false;
 };
 
 }  // namespace game

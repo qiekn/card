@@ -3,6 +3,8 @@
 #include <memory>
 #include <vector>
 
+#include <raylib.h>
+
 #include "game/card.h"
 
 namespace game {
@@ -60,6 +62,11 @@ class CardArea {
 
   // Draws all owned cards in slot order.
   void Render();
+
+  // Hit-tests `mouse` (in RT/scene pixel coords) against each card's VT,
+  // walking back-to-front so the visually topmost card wins. Returns
+  // nullptr if no card is hit.
+  Card* FindHovered(Vector2 mouse) const;
 
   size_t Size() const { return cards_.size(); }
   Card* At(size_t i) { return cards_[i].get(); }

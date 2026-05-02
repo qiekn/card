@@ -6,6 +6,30 @@
 
 namespace game {
 
+namespace {
+// Lift applied to highlighted cards in the Hand area. lua uses
+// G.HIGHLIGHT_H (game units); we pick a flat pixel constant so the
+// effect is visible regardless of card_h.
+constexpr float kHandHighlightLift = 40.0f;
+
+bool HitRotatedRect(const engine::Transform& vt, Vector2 p) {
+  // Translate p into the card's local frame (origin at center).
+  const float cx = vt.x + vt.w * 0.5f;
+  const float cy = vt.y + vt.h * 0.5f;
+  const float dx = p.x - cx;
+  const float dy = p.y - cy;
+  // Inverse-rotate by -vt.r to get axis-aligned coords.
+  const float c = std::cos(-vt.r);
+  const float s = std::sin(-vt.r);
+  const float lx = dx * c - dy * s;
+  const float ly = dx * s + dy * c;
+  // VT.scale shrinks/expands the visible rect uniformly (juice wobble).
+  const float hw = vt.w * vt.scale * 0.5f;
+  const float hh = vt.h * vt.scale * 0.5f;
+  return std::fabs(lx) <= hw && std::fabs(ly) <= hh;
+}
+}  // namespace
+
 CardArea::CardArea(float x, float y, float w, float h, CardAreaType type, float card_w, int temp_limit)
     : x_(x), y_(y), w_(w), h_(h), type_(type), card_w_(card_w), temp_limit_(temp_limit) {}
 
@@ -48,6 +72,16 @@ void CardArea::Render() {
   for (auto& c : cards_) c->Render();
 }
 
+Card* CardArea::FindHovered(Vector2 mouse) const {
+  // Walk back-to-front so the visually topmost card wins (later cards in
+  // the vector are drawn last → painted on top). MVP has no separate
+  // hover-lift z-order, so paint order == hit-order is fine.
+  for (auto it = cards_.rbegin(); it != cards_.rend(); ++it) {
+    if (HitRotatedRect((*it)->VT(), mouse)) return it->get();
+  }
+  return nullptr;
+}
+
 void CardArea::AlignCards(float t) {
   const int n = static_cast<int>(cards_.size());
   if (n == 0) return;
@@ -81,7 +115,10 @@ void CardArea::AlignCards(float t) {
       // sign on `bow` and the constant offset are tuned to keep the area
       // rect as the visual baseline (top of cards aligns with y_).
       const float bow = std::fabs(0.5f * (-nf * 0.5f + kf - 0.5f) / nf);  // 0..0.25
-      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - bow * c->T().h * 0.4f +
+      // Highlighted cards lift up — mirrors lua's `- highlight_height`
+      // term in the y formula. Click toggles the flag in GameLayer.
+      const float lift = c->Highlighted() ? kHandHighlightLift : 0.0f;
+      c->T().y = y_ + h_ * 0.5f - c->T().h * 0.5f - lift - bow * c->T().h * 0.4f +
                  0.03f * c->T().h * std::sin(0.666f * t + c->T().x);
     } else {
       // Play: flat row, no rotation, no wobble.
